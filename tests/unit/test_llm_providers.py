@@ -118,3 +118,64 @@ async def test_openai_provider_handles_errors():
 
         assert response.text == ""
         assert response.error == "API Error"
+
+
+from tclp_benchmark.llm_providers.anthropic_provider import AnthropicProvider
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_name():
+    """Test Anthropic provider returns correct name."""
+    provider = AnthropicProvider(config={}, api_key="test-key")
+    assert provider.get_provider_name() == "anthropic"
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_generates_response():
+    """Test Anthropic provider generates response."""
+    provider = AnthropicProvider(config={}, api_key="test-key")
+
+    # Mock Anthropic API response
+    with patch.object(provider.client.messages, "create", new_callable=AsyncMock) as mock_create:
+        mock_create.return_value = AsyncMock(
+            content=[AsyncMock(text="Test response")],
+            usage=AsyncMock(input_tokens=20, output_tokens=10),
+        )
+
+        request = LLMRequest(
+            prompt="Test prompt",
+            search_context=[],
+            max_tokens=1000,
+            temperature=0.1,
+            model_name="claude-3-7-sonnet-20250219",
+        )
+
+        response = await provider.generate_response(request)
+
+        assert response.text == "Test response"
+        assert response.provider_name == "anthropic"
+        assert response.model_name == "claude-3-7-sonnet-20250219"
+        assert response.error is None
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_handles_errors():
+    """Test Anthropic provider handles API errors gracefully."""
+    provider = AnthropicProvider(config={}, api_key="test-key")
+
+    # Mock Anthropic API to raise exception
+    with patch.object(provider.client.messages, "create", new_callable=AsyncMock) as mock_create:
+        mock_create.side_effect = Exception("API Error")
+
+        request = LLMRequest(
+            prompt="Test prompt",
+            search_context=[],
+            max_tokens=1000,
+            temperature=0.1,
+            model_name="claude-3-7-sonnet-20250219",
+        )
+
+        response = await provider.generate_response(request)
+
+        assert response.text == ""
+        assert response.error == "API Error"
