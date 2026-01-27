@@ -186,6 +186,60 @@ def report(version_a, version_b, output, format):
 
 @cli.command()
 @click.option(
+    "--version-tag",
+    required=True,
+    help="Version tag to generate report for",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output path for report",
+)
+@click.option(
+    "--format",
+    type=click.Choice(["markdown", "html"]),
+    default="html",
+    help="Report format",
+)
+def report_single(version_tag, output, format):
+    """Generate detailed report for a single evaluation run."""
+    console.print(f"[bold blue]Generating {format} report for single run[/bold blue]")
+    console.print(f"  Version: {version_tag}")
+    console.print(f"  Output: {output}")
+
+    try:
+        # Get database URL from environment or use default
+        db_url = os.getenv("DATABASE_URL", "sqlite:///data/tclp_benchmark.db")
+
+        # Initialize database
+        with console.status("[bold blue]Connecting to database..."):
+            db_manager = DatabaseManager(db_url)
+
+        console.print("[green]✓[/green] Connected to database")
+
+        # Generate report
+        with console.status(f"[bold blue]Generating {format} report..."):
+            generator = ReportGenerator(db_manager=db_manager)
+            generator.generate_single_run_report(
+                version_tag=version_tag,
+                output_path=output,
+                format=format,
+            )
+
+        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print(f"[bold]Output:[/bold] {output}")
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise click.Abort()
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise
+
+
+@cli.command()
+@click.option(
     "--status",
     type=click.Choice(["running", "completed", "failed"]),
     help="Filter by status",
