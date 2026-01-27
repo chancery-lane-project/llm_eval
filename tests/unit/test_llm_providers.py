@@ -179,3 +179,76 @@ async def test_anthropic_provider_handles_errors():
 
         assert response.text == ""
         assert response.error == "API Error"
+
+
+from tclp_benchmark.llm_providers.gemini_provider import GeminiProvider
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_name():
+    """Test Gemini provider returns correct name."""
+    provider = GeminiProvider(config={}, api_key="test-key")
+    assert provider.get_provider_name() == "gemini"
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_generates_response():
+    """Test Gemini provider generates response."""
+    import google.generativeai as genai
+
+    provider = GeminiProvider(config={}, api_key="test-key")
+
+    # Mock Gemini API response
+    mock_response = AsyncMock()
+    mock_response.text = "Test response"
+    mock_response.usage_metadata = AsyncMock(
+        prompt_token_count=20,
+        candidates_token_count=10,
+        total_token_count=30,
+    )
+
+    # Mock the GenerativeModel class
+    mock_model = AsyncMock()
+    mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+
+    with patch.object(genai, "GenerativeModel", return_value=mock_model):
+        request = LLMRequest(
+            prompt="Test prompt",
+            search_context=[],
+            max_tokens=1000,
+            temperature=0.1,
+            model_name="gemini-2.0-flash",
+        )
+
+        response = await provider.generate_response(request)
+
+        assert response.text == "Test response"
+        assert response.provider_name == "gemini"
+        assert response.model_name == "gemini-2.0-flash"
+        assert response.error is None
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_handles_errors():
+    """Test Gemini provider handles API errors gracefully."""
+    import google.generativeai as genai
+
+    provider = GeminiProvider(config={}, api_key="test-key")
+
+    # Mock the GenerativeModel class to raise exception
+    mock_model = AsyncMock()
+    mock_model.generate_content_async = AsyncMock(side_effect=Exception("API Error"))
+
+    with patch.object(genai, "GenerativeModel", return_value=mock_model):
+        request = LLMRequest(
+            prompt="Test prompt",
+            search_context=[],
+            max_tokens=1000,
+            temperature=0.1,
+            model_name="gemini-2.0-flash",
+        )
+
+        response = await provider.generate_response(request)
+
+        assert response.text == ""
+        assert response.error == "API Error"
