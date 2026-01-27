@@ -117,27 +117,24 @@ def mock_db_manager():
     test_case_b.llm_responses = [response_b]
     response_b.metric_scores = [metric_b1, metric_b2]
 
-    # Mock query methods
+    # Mock query methods with options() chaining support
     def mock_filter_by(**kwargs):
-        if kwargs.get("version_tag") == "pre-jsonld":
-            result = MagicMock()
-            result.first.return_value = run_a
-            return result
-        elif kwargs.get("version_tag") == "post-jsonld":
-            result = MagicMock()
-            result.first.return_value = run_b
-            return result
-        elif kwargs.get("id") == 1:
-            result = MagicMock()
-            result.first.return_value = run_a
-            return result
-        elif kwargs.get("id") == 2:
-            result = MagicMock()
-            result.first.return_value = run_b
-            return result
-        # Return None for nonexistent runs
         result = MagicMock()
-        result.first.return_value = None
+        # Add options() method that returns self for chaining
+        result.options.return_value = result
+
+        if kwargs.get("version_tag") == "pre-jsonld":
+            result.first.return_value = run_a
+        elif kwargs.get("version_tag") == "post-jsonld":
+            result.first.return_value = run_b
+        elif kwargs.get("id") == 1:
+            result.first.return_value = run_a
+        elif kwargs.get("id") == 2:
+            result.first.return_value = run_b
+        else:
+            # Return None for nonexistent runs
+            result.first.return_value = None
+
         return result
 
     session.query.return_value.filter_by = mock_filter_by
