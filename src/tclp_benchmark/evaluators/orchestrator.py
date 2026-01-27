@@ -3,6 +3,9 @@ import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from deepeval.test_case import LLMTestCase
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
 
 from ..storage.database import DatabaseManager
 from ..storage.models import EvaluationRun, TestCase, LLMResponse as DBLLMResponse, MetricScore
@@ -13,18 +16,22 @@ from ..llm_providers.anthropic_provider import AnthropicProvider
 from ..llm_providers.gemini_provider import GeminiProvider
 from ..evaluators.custom_metrics import TCLPCitationMetric, TaxonomyAwarenessMetric
 
+console = Console()
+
 
 class EvaluationOrchestrator:
     """Orchestrates evaluation runs across LLM providers and metrics."""
 
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self, db_manager: DatabaseManager, verbose: bool = True):
         """
         Initialise orchestrator.
 
         Args:
             db_manager: Database manager for storing results
+            verbose: Whether to output detailed progress
         """
         self.db_manager = db_manager
+        self.verbose = verbose
 
     async def run_evaluation(
         self,
@@ -122,6 +129,15 @@ class EvaluationOrchestrator:
             metrics_config: Metrics configuration
             provider_filter: Optional list of providers to use
         """
+        # Show prompt being executed
+        if self.verbose:
+            console.print("\n")
+            console.print(Panel(
+                f"[bold cyan]{prompt.text}[/bold cyan]",
+                title=f"[bold]📝 Prompt ({category})[/bold]",
+                border_style="cyan",
+            ))
+
         # Create test case
         with self.db_manager.get_session() as session:
             test_case = TestCase(
@@ -177,6 +193,10 @@ class EvaluationOrchestrator:
             prompt: Test prompt
             metrics_config: Metrics configuration
         """
+        # Show which model is being called
+        if self.verbose:
+            console.print(f"\n  [bold blue]→ {provider_name}/{model_config.name}[/bold blue]", end=" ")
+
         # Create provider
         provider = self._create_provider(provider_name)
 
@@ -191,6 +211,22 @@ class EvaluationOrchestrator:
 
         # Generate response
         response = await provider.generate_response(request)
+
+        # Show response or error
+        if self.verbose:
+            if response.error:
+                console.print(f"[red]✗ Error[/red]")
+                console.print(f"    [dim red]{response.error[:100]}...[/dim red]")
+            else:
+                console.print(f"[green]✓ {response.execution_time_ms}ms[/green]")
+                # Show response in a panel
+                response_preview = response.text[:300] + "..." if len(response.text) > 300 else response.text
+                console.print(Panel(
+                    f"[dim]{response_preview}[/dim]",
+                    title=f"[bold green]Response[/bold green]",
+                    border_style="green",
+                    padding=(0, 2),
+                ))
 
         # Store LLM response
         with self.db_manager.get_session() as session:
@@ -212,12 +248,19 @@ class EvaluationOrchestrator:
 
         # Evaluate with metrics (only if response has text)
         if response.text:
-            await self._evaluate_metrics(
+            metric_scores = await self._evaluate_metrics(
                 response_id=response_id,
                 prompt=prompt,
                 response_text=response.text,
                 metrics_config=metrics_config,
             )
+
+            # Show metrics
+            if self.verbose and metric_scores:
+                console.print("    [bold]Metrics:[/bold]")
+                for metric_name, score_data in metric_scores.items():
+                    status = "[green]✓ Pass[/green]" if score_data["passed"] else "[red]✗ Fail[/red]"
+                    console.print(f"      • {metric_name}: {score_data['score']:.3f} {status}")
 
     async def _evaluate_metrics(
         self,
@@ -225,7 +268,7 @@ class EvaluationOrchestrator:
         prompt: TestPrompt,
         response_text: str,
         metrics_config: MetricsConfig,
-    ):
+    ) -> Dict[str, Any]:
         """
         Evaluate response with all enabled metrics.
 
@@ -234,7 +277,12 @@ class EvaluationOrchestrator:
             prompt: Test prompt
             response_text: LLM response text
             metrics_config: Metrics configuration
+
+        Returns:
+            Dictionary of metric scores
         """
+        scores = {}
+
         # Create DeepEval test case
         test_case = LLMTestCase(
             input=prompt.text,
@@ -264,6 +312,12 @@ class EvaluationOrchestrator:
                         session.add(metric_score)
                         session.commit()
 
+                    scores["tclp_citation"] = {
+                        "score": score,
+                        "passed": metric.is_successful(),
+                        "threshold": metric_config.threshold,
+                    }
+
             # Taxonomy Awareness Metric
             if "taxonomy_awareness" in metrics_config.tclp_custom:
                 metric_config = metrics_config.tclp_custom["taxonomy_awareness"]
@@ -283,6 +337,14 @@ class EvaluationOrchestrator:
                         )
                         session.add(metric_score)
                         session.commit()
+
+                    scores["taxonomy_awareness"] = {
+                        "score": score,
+                        "passed": metric.is_successful(),
+                        "threshold": metric_config.threshold,
+                    }
+
+        return scores
 
     def _create_provider(self, provider_name: str) -> BaseLLMProvider:
         """

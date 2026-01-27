@@ -90,9 +90,9 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
         provider_filter = providers.split(",") if providers else None
 
         # Run evaluation
-        console.print("\n[bold blue]Starting evaluation...[/bold blue]\n")
+        console.print("\n[bold blue]Starting evaluation...[/bold blue]")
 
-        orchestrator = EvaluationOrchestrator(db_manager=db_manager)
+        orchestrator = EvaluationOrchestrator(db_manager=db_manager, verbose=True)
 
         run_id = asyncio.run(
             orchestrator.run_evaluation(
