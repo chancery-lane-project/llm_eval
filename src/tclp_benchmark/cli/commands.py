@@ -9,6 +9,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from ..config.loader import ConfigLoader
 from ..storage.database import DatabaseManager
 from ..evaluators.orchestrator import EvaluationOrchestrator
+from ..reporting.report_generator import ReportGenerator
 
 console = Console()
 
@@ -152,8 +153,35 @@ def report(version_a, version_b, output, format):
     console.print(f"  Comparing: {version_a} vs {version_b}")
     console.print(f"  Output: {output}")
 
-    # TODO: Implement report generation
-    console.print("[yellow]Report generation not yet implemented[/yellow]")
+    try:
+        # Get database URL from environment or use default
+        db_url = os.getenv("DATABASE_URL", "sqlite:///data/tclp_benchmark.db")
+
+        # Initialize database
+        with console.status("[bold blue]Connecting to database..."):
+            db_manager = DatabaseManager(db_url)
+
+        console.print("[green]✓[/green] Connected to database")
+
+        # Generate report
+        with console.status(f"[bold blue]Generating {format} report..."):
+            generator = ReportGenerator(db_manager=db_manager)
+            generator.generate_report(
+                version_a=version_a,
+                version_b=version_b,
+                output_path=output,
+                format=format,
+            )
+
+        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print(f"[bold]Output:[/bold] {output}")
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise click.Abort()
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise
 
 
 @cli.command()
