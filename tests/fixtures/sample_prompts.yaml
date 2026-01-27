@@ -1,0 +1,20 @@
+prompts:
+  direct_lookup:
+    - id: dl_001
+      text: Find the net zero carbon commitment clause from The Chancery Lane Project
+      expected_tclp_mention: true
+      expected_clause_name: Net Zero Carbon Commitment
+
+    - id: dl_002
+      text: What is the TCLP biodiversity clause?
+      expected_tclp_mention: true
+      expected_clause_name: Biodiversity Clause
+
+  filtered_discovery:
+    - id: fd_001
+      text: Show me carbon reduction clauses for UK construction contracts from The Chancery Lane Project
+      expected_tclp_mention: true
+      expected_filters:
+        climate_impact: carbon reduction
+        jurisdiction: UK
+        practice_area: construction
