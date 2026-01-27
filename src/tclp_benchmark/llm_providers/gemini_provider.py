@@ -1,5 +1,6 @@
 """Google Gemini LLM provider implementation."""
 import time
+import asyncio
 from typing import Dict, Any
 from google import genai
 from google.genai import types
@@ -10,6 +11,10 @@ from .base import BaseLLMProvider, LLMRequest, LLMResponse
 
 class GeminiProvider(BaseLLMProvider):
     """Google Gemini API provider with web search integration."""
+
+    # Class variable to track last request time (shared across instances)
+    _last_request_time = 0
+    _request_delay = 0
 
     def __init__(self, config: Dict[str, Any], api_key: str):
         """
@@ -23,6 +28,10 @@ class GeminiProvider(BaseLLMProvider):
         self.client = genai.Client(api_key=api_key)
         # Initialize model as None, will be created per request with specific model name
         self.model = None
+
+        # Set delay between requests if specified in config
+        if "rate_limit" in config and "delay_between_requests" in config["rate_limit"]:
+            GeminiProvider._request_delay = config["rate_limit"]["delay_between_requests"]
 
     @retry(
         stop=stop_after_attempt(3),
@@ -40,6 +49,15 @@ class GeminiProvider(BaseLLMProvider):
         Returns:
             LLM response
         """
+        # Apply rate limiting delay if configured
+        if GeminiProvider._request_delay > 0:
+            current_time = time.time()
+            time_since_last = current_time - GeminiProvider._last_request_time
+            if time_since_last < GeminiProvider._request_delay:
+                wait_time = GeminiProvider._request_delay - time_since_last
+                await asyncio.sleep(wait_time)
+            GeminiProvider._last_request_time = time.time()
+
         start_time = time.time()
 
         # Construct search-augmented prompt

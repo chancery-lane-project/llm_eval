@@ -170,6 +170,7 @@ class EvaluationOrchestrator:
                 await self._execute_model(
                     test_case_id=test_case_id,
                     provider_name=provider_name,
+                    provider_config=provider_config,
                     model_config=model_config,
                     prompt=prompt,
                     metrics_config=metrics_config,
@@ -179,6 +180,7 @@ class EvaluationOrchestrator:
         self,
         test_case_id: int,
         provider_name: str,
+        provider_config: Any,
         model_config: Any,
         prompt: TestPrompt,
         metrics_config: MetricsConfig,
@@ -189,6 +191,7 @@ class EvaluationOrchestrator:
         Args:
             test_case_id: Test case ID
             provider_name: Provider name
+            provider_config: Provider configuration
             model_config: Model configuration
             prompt: Test prompt
             metrics_config: Metrics configuration
@@ -198,7 +201,7 @@ class EvaluationOrchestrator:
             console.print(f"\n  [bold blue]→ {provider_name}/{model_config.name}[/bold blue]", end=" ")
 
         # Create provider
-        provider = self._create_provider(provider_name)
+        provider = self._create_provider(provider_name, provider_config)
 
         # Create LLM request (no search context for now)
         request = LLMRequest(
@@ -346,12 +349,13 @@ class EvaluationOrchestrator:
 
         return scores
 
-    def _create_provider(self, provider_name: str) -> BaseLLMProvider:
+    def _create_provider(self, provider_name: str, provider_config: Any) -> BaseLLMProvider:
         """
         Create LLM provider instance.
 
         Args:
             provider_name: Provider name
+            provider_config: Provider configuration
 
         Returns:
             Provider instance
@@ -375,4 +379,6 @@ class EvaluationOrchestrator:
         }
 
         provider_class = provider_map[provider_name]
-        return provider_class(config={}, api_key=api_key)
+        # Convert Pydantic config to dict
+        config_dict = provider_config.model_dump() if hasattr(provider_config, 'model_dump') else {}
+        return provider_class(config=config_dict, api_key=api_key)

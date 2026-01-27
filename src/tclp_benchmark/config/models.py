@@ -49,6 +49,7 @@ class RateLimitConfig(BaseModel):
 
     requests_per_minute: int = Field(ge=1)
     tokens_per_minute: int = Field(ge=1)
+    delay_between_requests: Optional[int] = Field(default=None, ge=0, description="Delay in seconds between requests")
 
 
 class RetryConfig(BaseModel):

@@ -36,12 +36,13 @@ anthropic:
 gemini:
   enabled: true
   models:
-    - name: gemini-2.0-flash
+    - name: gemini-2.0-flash-exp
       max_tokens: 1000
       temperature: 0.1
   rate_limit:
-    requests_per_minute: 60
+    requests_per_minute: 6
     tokens_per_minute: 200000
+    delay_between_requests: 10
   retry:
     max_attempts: 3
     exponential_base: 2
