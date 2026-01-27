@@ -194,8 +194,6 @@ async def test_gemini_provider_name():
 @pytest.mark.asyncio
 async def test_gemini_provider_generates_response():
     """Test Gemini provider generates response."""
-    import google.generativeai as genai
-
     provider = GeminiProvider(config={}, api_key="test-key")
 
     # Mock Gemini API response
@@ -207,11 +205,12 @@ async def test_gemini_provider_generates_response():
         total_token_count=30,
     )
 
-    # Mock the GenerativeModel class
-    mock_model = AsyncMock()
-    mock_model.generate_content_async = AsyncMock(return_value=mock_response)
+    # Mock the client's aio.models.generate_content method
+    with patch.object(
+        provider.client.aio.models, "generate_content", new_callable=AsyncMock
+    ) as mock_generate:
+        mock_generate.return_value = mock_response
 
-    with patch.object(genai, "GenerativeModel", return_value=mock_model):
         request = LLMRequest(
             prompt="Test prompt",
             search_context=[],
@@ -231,15 +230,14 @@ async def test_gemini_provider_generates_response():
 @pytest.mark.asyncio
 async def test_gemini_provider_handles_errors():
     """Test Gemini provider handles API errors gracefully."""
-    import google.generativeai as genai
-
     provider = GeminiProvider(config={}, api_key="test-key")
 
-    # Mock the GenerativeModel class to raise exception
-    mock_model = AsyncMock()
-    mock_model.generate_content_async = AsyncMock(side_effect=Exception("API Error"))
+    # Mock the client to raise exception
+    with patch.object(
+        provider.client.aio.models, "generate_content", new_callable=AsyncMock
+    ) as mock_generate:
+        mock_generate.side_effect = Exception("API Error")
 
-    with patch.object(genai, "GenerativeModel", return_value=mock_model):
         request = LLMRequest(
             prompt="Test prompt",
             search_context=[],
