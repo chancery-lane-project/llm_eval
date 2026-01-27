@@ -1,7 +1,14 @@
 """CLI commands for TCLP Benchmark."""
+import os
+import asyncio
 import click
 from pathlib import Path
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from ..config.loader import ConfigLoader
+from ..storage.database import DatabaseManager
+from ..evaluators.orchestrator import EvaluationOrchestrator
 
 console = Console()
 
@@ -59,8 +66,61 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
     if providers:
         console.print(f"  Using providers: {providers}")
 
-    # TODO: Implement evaluation workflow
-    console.print("[yellow]Evaluation not yet implemented[/yellow]")
+    try:
+        # Load configurations
+        with console.status("[bold blue]Loading configurations..."):
+            prompts_cfg = ConfigLoader.load_prompts(prompts_config)
+            providers_cfg = ConfigLoader.load_providers(providers_config)
+            metrics_cfg = ConfigLoader.load_metrics(metrics_config)
+
+        console.print("[green]✓[/green] Configurations loaded")
+
+        # Get database URL from environment or use default
+        db_url = os.getenv("DATABASE_URL", "sqlite:///data/tclp_benchmark.db")
+
+        # Initialize database
+        with console.status("[bold blue]Initialising database..."):
+            db_manager = DatabaseManager(db_url)
+            db_manager.create_tables()
+
+        console.print("[green]✓[/green] Database initialized")
+
+        # Parse provider filter
+        provider_filter = providers.split(",") if providers else None
+
+        # Run evaluation
+        console.print("\n[bold blue]Starting evaluation...[/bold blue]\n")
+
+        orchestrator = EvaluationOrchestrator(db_manager=db_manager)
+
+        run_id = asyncio.run(
+            orchestrator.run_evaluation(
+                version_tag=version_tag,
+                prompts_config=prompts_cfg,
+                providers_config=providers_cfg,
+                metrics_config=metrics_cfg,
+                category_filter=category,
+                provider_filter=provider_filter,
+            )
+        )
+
+        console.print(f"\n[green]✓[/green] Evaluation completed successfully")
+        console.print(f"[bold]Run ID:[/bold] {run_id}")
+        console.print(f"[bold]Version Tag:[/bold] {version_tag}")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] Configuration file not found: {e}")
+        raise click.Abort()
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        console.print("\n[yellow]Tip:[/yellow] Make sure API keys are set in .env file:")
+        console.print("  OPENAI_API_KEY=...")
+        console.print("  ANTHROPIC_API_KEY=...")
+        console.print("  GOOGLE_API_KEY=...")
+        raise click.Abort()
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise
 
 
 @cli.command()
