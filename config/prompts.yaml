@@ -226,11 +226,11 @@ prompts:
     - id: cpi_002
       text: Show me The Chancery Lane Project's approach to ESG in both M&A and real estate sectors
       expected_tclp_mention: true
-      expected_filters:
-        practice_area:
-          - Corporate, mergers and acquisitions (M&A)
-          - Real estate and property
-        climate_impact: ESG
+      expected_concepts:
+        - ESG
+        - M&A
+        - real estate
+        - governance
 
     - id: cpi_003
       text: What clauses from TCLP combine supply chain obligations with carbon accounting requirements?
@@ -304,21 +304,17 @@ prompts:
     - id: comp_002
       text: Compare The Chancery Lane Project's approach to carbon reduction in construction versus real estate
       expected_tclp_mention: true
-      expected_filters:
-        practice_area:
-          - Construction
-          - Real estate and property
       expected_concepts:
         - carbon reduction
+        - construction
+        - real estate
         - comparison
 
     - id: comp_003
       text: What are the differences in TCLP's climate clauses for different jurisdictions like Australia versus England & Wales?
       expected_tclp_mention: true
-      expected_filters:
-        jurisdiction:
-          - Australia
-          - England & Wales
       expected_concepts:
+        - Australia
+        - England & Wales
         - jurisdictional differences
         - legal frameworks
