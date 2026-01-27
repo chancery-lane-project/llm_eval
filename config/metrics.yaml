@@ -1,0 +1,22 @@
+# Evaluation metrics configuration
+deepeval_standard:
+  answer_relevancy:
+    enabled: true
+    threshold: 0.7
+    model: gpt-4o
+
+  faithfulness:
+    enabled: true
+    threshold: 0.7
+    model: gpt-4o
+
+tclp_custom:
+  tclp_citation:
+    enabled: true
+    threshold: 0.8
+    description: Does the response mention The Chancery Lane Project or TCLP?
+
+  taxonomy_awareness:
+    enabled: true
+    threshold: 0.6
+    description: Does the response demonstrate awareness of TCLP taxonomies?

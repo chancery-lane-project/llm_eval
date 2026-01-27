@@ -1,0 +1,59 @@
+# Test prompts organised by category
+prompts:
+  direct_lookup:
+    - id: dl_001
+      text: Find the net zero carbon commitment clause from The Chancery Lane Project
+      expected_tclp_mention: true
+      expected_clause_name: Net Zero Carbon Commitment
+
+    - id: dl_002
+      text: What is the TCLP biodiversity clause?
+      expected_tclp_mention: true
+      expected_clause_name: Biodiversity Clause
+
+  filtered_discovery:
+    - id: fd_001
+      text: Show me carbon reduction clauses for UK construction contracts from The Chancery Lane Project
+      expected_tclp_mention: true
+      expected_filters:
+        climate_impact: carbon reduction
+        jurisdiction: UK
+        practice_area: construction
+
+    - id: fd_002
+      text: Find TCLP clauses for supply chain emissions in procurement contracts
+      expected_tclp_mention: true
+      expected_filters:
+        climate_impact: supply chain emissions
+        practice_area: procurement
+
+  conceptual_queries:
+    - id: cq_001
+      text: What legal mechanisms exist for supply chain emissions accountability?
+      expected_tclp_mention: false
+      expected_concepts:
+        - supply chain
+        - emissions
+        - accountability
+
+  metadata_queries:
+    - id: mq_001
+      text: What maintenance status is the TCLP biodiversity clause?
+      expected_tclp_mention: true
+      expected_metadata_type: maintenance_status
+
+    - id: mq_002
+      text: Which TCLP clauses are actively maintained?
+      expected_tclp_mention: true
+      expected_metadata_type: maintenance_status
+
+  standards_linkage:
+    - id: sl_001
+      text: Which The Chancery Lane Project clauses reference Science Based Targets initiative?
+      expected_tclp_mention: true
+      expected_standard: SBTi
+
+    - id: sl_002
+      text: Find TCLP clauses aligned with GHG Protocol
+      expected_tclp_mention: true
+      expected_standard: GHG Protocol
