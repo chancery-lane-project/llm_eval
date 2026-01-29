@@ -53,7 +53,8 @@ def cli():
 @click.option(
     "--providers",
     type=str,
-    help="Comma-separated list of providers to use (e.g., 'openai,anthropic')",
+    help="Comma-separated list of providers to use (e.g., 'openai,anthropic,openrouter'). "
+         "Defaults to all enabled providers in config.",
 )
 def run(version_tag, prompts_config, providers_config, metrics_config, category, providers):
     """Run evaluation with test prompts against LLM providers."""
