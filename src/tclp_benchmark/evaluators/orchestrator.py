@@ -14,6 +14,7 @@ from ..llm_providers.base import BaseLLMProvider, LLMRequest
 from ..llm_providers.openai_provider import OpenAIProvider
 from ..llm_providers.anthropic_provider import AnthropicProvider
 from ..llm_providers.gemini_provider import GeminiProvider
+from ..llm_providers.openrouter_provider import OpenRouterProvider
 from ..evaluators.custom_metrics import (
     TCLPCitationMetric,
     TaxonomyAwarenessMetric,
@@ -162,6 +163,7 @@ class EvaluationOrchestrator:
             "openai": providers_config.openai,
             "anthropic": providers_config.anthropic,
             "gemini": providers_config.gemini,
+            "openrouter": providers_config.openrouter,
         }
 
         for provider_name, provider_config in provider_configs.items():
@@ -171,16 +173,35 @@ class EvaluationOrchestrator:
             if provider_filter and provider_name not in provider_filter:
                 continue
 
-            # Execute against each model
-            for model_config in provider_config.models:
-                await self._execute_model(
-                    test_case_id=test_case_id,
-                    provider_name=provider_name,
-                    provider_config=provider_config,
-                    model_config=model_config,
-                    prompt=prompt,
-                    metrics_config=metrics_config,
-                )
+            # Handle OpenRouter's different config structure
+            if provider_name == "openrouter":
+                # OpenRouter has models as strings and max_tokens/temp at provider level
+                from ..config.models import ModelConfig
+                for model_name in provider_config.models:
+                    model_config = ModelConfig(
+                        name=model_name,
+                        max_tokens=provider_config.max_tokens,
+                        temperature=provider_config.temperature,
+                    )
+                    await self._execute_model(
+                        test_case_id=test_case_id,
+                        provider_name=provider_name,
+                        provider_config=provider_config,
+                        model_config=model_config,
+                        prompt=prompt,
+                        metrics_config=metrics_config,
+                    )
+            else:
+                # Other providers have models as ModelConfig objects
+                for model_config in provider_config.models:
+                    await self._execute_model(
+                        test_case_id=test_case_id,
+                        provider_name=provider_name,
+                        provider_config=provider_config,
+                        model_config=model_config,
+                        prompt=prompt,
+                        metrics_config=metrics_config,
+                    )
 
     async def _execute_model(
         self,
@@ -458,6 +479,7 @@ class EvaluationOrchestrator:
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
             "gemini": "GOOGLE_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
         }
 
         api_key = os.getenv(api_key_map[provider_name])
@@ -469,6 +491,7 @@ class EvaluationOrchestrator:
             "openai": OpenAIProvider,
             "anthropic": AnthropicProvider,
             "gemini": GeminiProvider,
+            "openrouter": OpenRouterProvider,
         }
 
         provider_class = provider_map[provider_name]

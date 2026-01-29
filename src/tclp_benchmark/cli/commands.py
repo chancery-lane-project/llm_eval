@@ -118,6 +118,7 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
         console.print("  OPENAI_API_KEY=...")
         console.print("  ANTHROPIC_API_KEY=...")
         console.print("  GOOGLE_API_KEY=...")
+        console.print("  OPENROUTER_API_KEY=...")
         raise click.Abort()
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
