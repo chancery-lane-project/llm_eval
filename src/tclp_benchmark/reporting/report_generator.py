@@ -458,7 +458,16 @@ class ReportGenerator:
             lines.append("")
 
             for provider, metrics in comparison["by_provider"].items():
-                lines.append(f"### {provider}")
+                # Highlight OpenRouter providers
+                provider_label = provider
+                if provider.startswith("openrouter/"):
+                    model_name = provider.split("/", 1)[1] if "/" in provider else provider
+                    if ":online" in model_name:
+                        provider_label = f"{provider} 🌐 **(Web Search Enabled)**"
+                    else:
+                        provider_label = f"{provider} (via OpenRouter)"
+
+                lines.append(f"### {provider_label}")
                 lines.append("")
                 lines.append("| Metric | Baseline | Comparison | Improvement | Improvement % |")
                 lines.append("|--------|----------|------------|-------------|---------------|")
@@ -759,6 +768,51 @@ class ReportGenerator:
             html += """            </div>
 """
 
+        # Add provider breakdowns if available
+        if comparison["by_provider"]:
+            html += """            <div class="section">
+                <h2>🔧 Performance by Provider</h2>
+"""
+            for provider, metrics in comparison["by_provider"].items():
+                # Format provider name with OpenRouter indication
+                provider_display = provider
+                web_search_badge = ""
+                if provider.startswith("openrouter/"):
+                    model_name = provider.split("/", 1)[1] if "/" in provider else provider
+                    if ":online" in model_name:
+                        web_search_badge = ' <span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold;">🌐 Web Search</span>'
+
+                html += f"""                <h3 style="margin: 30px 0 15px 0; color: #495057;">{provider_display}{web_search_badge}</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Baseline</th>
+                            <th>Comparison</th>
+                            <th>Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+                for metric_name, data in metrics.items():
+                    improvement_class = "positive" if data["improvement"] > 0 else ("negative" if data["improvement"] < 0 else "neutral")
+                    improvement_sign = "+" if data["improvement"] >= 0 else ""
+
+                    html += f"""                        <tr>
+                            <td>{metric_name}</td>
+                            <td>{data['baseline']:.3f}</td>
+                            <td>{data['comparison']:.3f}</td>
+                            <td><span class="improvement {improvement_class}">{improvement_sign}{data['improvement']:.3f}</span></td>
+                        </tr>
+"""
+
+                html += """                    </tbody>
+                </table>
+"""
+
+            html += """            </div>
+"""
+
         # Add Charts JavaScript
         html += f"""        </div>
 
@@ -941,7 +995,16 @@ class ReportGenerator:
             lines.append("")
 
             for provider, metrics in stats["by_provider"].items():
-                lines.append(f"### {provider}")
+                # Highlight OpenRouter providers
+                provider_label = provider
+                if provider.startswith("openrouter/"):
+                    model_name = provider.split("/", 1)[1] if "/" in provider else provider
+                    if ":online" in model_name:
+                        provider_label = f"{provider} 🌐 **(Web Search Enabled)**"
+                    else:
+                        provider_label = f"{provider} (via OpenRouter)"
+
+                lines.append(f"### {provider_label}")
                 lines.append("")
                 lines.append("| Metric | Avg Score | Total Tests |")
                 lines.append("|--------|-----------|-------------|")
@@ -1269,8 +1332,14 @@ class ReportGenerator:
 """
 
             for response in test_case["responses"]:
+                # Format provider/model display with OpenRouter indication
+                provider_model = f"{response['provider']}/{response['model']}"
+                web_search_badge = ""
+                if response['provider'] == "openrouter" and ":online" in response['model']:
+                    web_search_badge = ' <span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; margin-left: 8px;">🌐 Web Search</span>'
+
                 html += f"""                    <div class="response">
-                        <h4>{response['provider']}/{response['model']}</h4>
+                        <h4>{provider_model}{web_search_badge}</h4>
 """
 
                 if response["error"]:
