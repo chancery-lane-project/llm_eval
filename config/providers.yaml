@@ -1,48 +1,31 @@
 # LLM provider configurations
-openai:
+openrouter:
   enabled: true
   models:
-    - name: gpt-4-turbo
+    - name: openai/gpt-4-turbo:online
       max_tokens: 1000
       temperature: 0.1
-    - name: gpt-3.5-turbo
+    - name: openai/gpt-3.5-turbo:online
+      max_tokens: 1000
+      temperature: 0.1
+    - name: anthropic/claude-3.5-sonnet:online
+      max_tokens: 1000
+      temperature: 0.1
+    - name: anthropic/claude-3-haiku:online
+      max_tokens: 1000
+      temperature: 0.1
+    - name: google/gemini-2.0-flash-exp:online
+      max_tokens: 1000
+      temperature: 0.1
+    - name: google/gemini-pro:online
+      max_tokens: 1000
+      temperature: 0.1
+    - name: google/gemini-1.5-pro:online
       max_tokens: 1000
       temperature: 0.1
   rate_limit:
     requests_per_minute: 50
     tokens_per_minute: 150000
-  retry:
-    max_attempts: 3
-    exponential_base: 2
-    max_wait_seconds: 60
-
-anthropic:
-  enabled: true
-  models:
-    - name: claude-3-7-sonnet-20250219
-      max_tokens: 1000
-      temperature: 0.1
-    - name: claude-3-5-haiku-20241022
-      max_tokens: 1000
-      temperature: 0.1
-  rate_limit:
-    requests_per_minute: 50
-    tokens_per_minute: 100000
-  retry:
-    max_attempts: 3
-    exponential_base: 2
-    max_wait_seconds: 60
-
-gemini:
-  enabled: true
-  models:
-    - name: gemini-2.0-flash-exp
-      max_tokens: 1000
-      temperature: 0.1
-  rate_limit:
-    requests_per_minute: 6
-    tokens_per_minute: 200000
-    delay_between_requests: 10
   retry:
     max_attempts: 3
     exponential_base: 2

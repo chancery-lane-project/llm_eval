@@ -82,9 +82,7 @@ class MetricConfig(BaseModel):
 class ProvidersConfig(BaseModel):
     """Configuration for all LLM providers."""
 
-    openai: Optional[ProviderConfig] = None
-    anthropic: Optional[ProviderConfig] = None
-    gemini: Optional[ProviderConfig] = None
+    openrouter: Optional[ProviderConfig] = None
 
 
 class MetricsConfig(BaseModel):

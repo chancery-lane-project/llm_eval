@@ -11,9 +11,7 @@ from ..storage.database import DatabaseManager
 from ..storage.models import EvaluationRun, TestCase, LLMResponse as DBLLMResponse, MetricScore
 from ..config.models import PromptConfig, ProvidersConfig, MetricsConfig, TestPrompt
 from ..llm_providers.base import BaseLLMProvider, LLMRequest
-from ..llm_providers.openai_provider import OpenAIProvider
-from ..llm_providers.anthropic_provider import AnthropicProvider
-from ..llm_providers.gemini_provider import GeminiProvider
+from ..llm_providers.openrouter_provider import OpenRouterProvider
 from ..evaluators.custom_metrics import (
     TCLPCitationMetric,
     TaxonomyAwarenessMetric,
@@ -157,30 +155,23 @@ class EvaluationOrchestrator:
             session.refresh(test_case)
             test_case_id = test_case.id
 
-        # Execute against each enabled provider
-        provider_configs = {
-            "openai": providers_config.openai,
-            "anthropic": providers_config.anthropic,
-            "gemini": providers_config.gemini,
-        }
+        # Execute against OpenRouter provider
+        provider_config = providers_config.openrouter
+        if not provider_config or not provider_config.enabled:
+            return
+        if provider_filter and "openrouter" not in provider_filter:
+            return
 
-        for provider_name, provider_config in provider_configs.items():
-            # Skip if not enabled or filtered out
-            if not provider_config or not provider_config.enabled:
-                continue
-            if provider_filter and provider_name not in provider_filter:
-                continue
-
-            # Execute against each model
-            for model_config in provider_config.models:
-                await self._execute_model(
-                    test_case_id=test_case_id,
-                    provider_name=provider_name,
-                    provider_config=provider_config,
-                    model_config=model_config,
-                    prompt=prompt,
-                    metrics_config=metrics_config,
-                )
+        # Execute against each model
+        for model_config in provider_config.models:
+            await self._execute_model(
+                test_case_id=test_case_id,
+                provider_name="openrouter",
+                provider_config=provider_config,
+                model_config=model_config,
+                prompt=prompt,
+                metrics_config=metrics_config,
+            )
 
     async def _execute_model(
         self,
@@ -454,24 +445,11 @@ class EvaluationOrchestrator:
             Provider instance
         """
         # Get API key from environment
-        api_key_map = {
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-            "gemini": "GOOGLE_API_KEY",
-        }
-
-        api_key = os.getenv(api_key_map[provider_name])
+        api_key = os.getenv("OPENROUTER_API_KEY")
         if not api_key:
-            raise ValueError(f"API key not found for {provider_name}")
+            raise ValueError("API key not found for OpenRouter. Please set OPENROUTER_API_KEY in your .env file.")
 
         # Create provider
-        provider_map = {
-            "openai": OpenAIProvider,
-            "anthropic": AnthropicProvider,
-            "gemini": GeminiProvider,
-        }
-
-        provider_class = provider_map[provider_name]
         # Convert Pydantic config to dict
         config_dict = provider_config.model_dump() if hasattr(provider_config, 'model_dump') else {}
-        return provider_class(config=config_dict, api_key=api_key)
+        return OpenRouterProvider(config=config_dict, api_key=api_key)

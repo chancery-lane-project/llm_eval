@@ -1,15 +1,15 @@
 """CLI commands for TCLP Benchmark."""
-import os
 import asyncio
-import click
+import os
 from pathlib import Path
+
+import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..config.loader import ConfigLoader
-from ..storage.database import DatabaseManager
 from ..evaluators.orchestrator import EvaluationOrchestrator
 from ..reporting.report_generator import ReportGenerator
+from ..storage.database import DatabaseManager
 
 console = Console()
 
@@ -53,7 +53,7 @@ def cli():
 @click.option(
     "--providers",
     type=str,
-    help="Comma-separated list of providers to use (e.g., 'openai,anthropic')",
+    help="Comma-separated list of providers to use (e.g., 'openrouter')",
 )
 def run(version_tag, prompts_config, providers_config, metrics_config, category, providers):
     """Run evaluation with test prompts against LLM providers."""
@@ -105,7 +105,7 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
             )
         )
 
-        console.print(f"\n[green]✓[/green] Evaluation completed successfully")
+        console.print("\n[green]✓[/green] Evaluation completed successfully")
         console.print(f"[bold]Run ID:[/bold] {run_id}")
         console.print(f"[bold]Version Tag:[/bold] {version_tag}")
 
@@ -114,10 +114,8 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
         raise click.Abort()
     except ValueError as e:
         console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[yellow]Tip:[/yellow] Make sure API keys are set in .env file:")
-        console.print("  OPENAI_API_KEY=...")
-        console.print("  ANTHROPIC_API_KEY=...")
-        console.print("  GOOGLE_API_KEY=...")
+        console.print("\n[yellow]Tip:[/yellow] Make sure API key is set in .env file:")
+        console.print("  OPENROUTER_API_KEY=...")
         raise click.Abort()
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -173,7 +171,7 @@ def report(version_a, version_b, output, format):
                 format=format,
             )
 
-        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print("\n[green]✓[/green] Report generated successfully")
         console.print(f"[bold]Output:[/bold] {output}")
 
     except ValueError as e:
@@ -227,7 +225,7 @@ def report_single(version_tag, output, format):
                 format=format,
             )
 
-        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print("\n[green]✓[/green] Report generated successfully")
         console.print(f"[bold]Output:[/bold] {output}")
 
     except ValueError as e:

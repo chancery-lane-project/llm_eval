@@ -72,7 +72,7 @@ class BaseLLMProvider(ABC):
         Return the provider name.
 
         Returns:
-            Provider name (e.g., 'openai', 'anthropic', 'gemini')
+            Provider name (e.g., 'openrouter')
         """
         pass
 
