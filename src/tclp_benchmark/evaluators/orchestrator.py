@@ -14,7 +14,13 @@ from ..llm_providers.base import BaseLLMProvider, LLMRequest
 from ..llm_providers.openai_provider import OpenAIProvider
 from ..llm_providers.anthropic_provider import AnthropicProvider
 from ..llm_providers.gemini_provider import GeminiProvider
-from ..evaluators.custom_metrics import TCLPCitationMetric, TaxonomyAwarenessMetric
+from ..evaluators.custom_metrics import (
+    TCLPCitationMetric,
+    TaxonomyAwarenessMetric,
+    EntityRetrievalAccuracyMetric,
+    MetadataPrecisionMetric,
+    RelationshipTraversalScoreMetric,
+)
 
 console = Console()
 
@@ -342,6 +348,93 @@ class EvaluationOrchestrator:
                         session.commit()
 
                     scores["taxonomy_awareness"] = {
+                        "score": score,
+                        "passed": metric.is_successful(),
+                        "threshold": metric_config.threshold,
+                    }
+
+            # Entity Retrieval Accuracy Metric
+            if "entity_retrieval_accuracy" in metrics_config.tclp_custom:
+                metric_config = metrics_config.tclp_custom["entity_retrieval_accuracy"]
+                if metric_config.enabled:
+                    metric = EntityRetrievalAccuracyMetric(
+                        threshold=metric_config.threshold,
+                        expected_concepts=prompt.expected_concepts,
+                    )
+                    score = metric.measure(test_case)
+
+                    with self.db_manager.get_session() as session:
+                        metric_score = MetricScore(
+                            llm_response_id=response_id,
+                            metric_name="entity_retrieval_accuracy",
+                            metric_category="tclp_custom",
+                            score=score,
+                            threshold=metric_config.threshold,
+                            passed=1 if metric.is_successful() else 0,
+                            reasoning=metric.reason,
+                        )
+                        session.add(metric_score)
+                        session.commit()
+
+                    scores["entity_retrieval_accuracy"] = {
+                        "score": score,
+                        "passed": metric.is_successful(),
+                        "threshold": metric_config.threshold,
+                    }
+
+            # Metadata Precision Metric
+            if "metadata_precision" in metrics_config.tclp_custom:
+                metric_config = metrics_config.tclp_custom["metadata_precision"]
+                if metric_config.enabled:
+                    metric = MetadataPrecisionMetric(
+                        threshold=metric_config.threshold,
+                        expected_concepts=prompt.expected_concepts,
+                    )
+                    score = metric.measure(test_case)
+
+                    with self.db_manager.get_session() as session:
+                        metric_score = MetricScore(
+                            llm_response_id=response_id,
+                            metric_name="metadata_precision",
+                            metric_category="tclp_custom",
+                            score=score,
+                            threshold=metric_config.threshold,
+                            passed=1 if metric.is_successful() else 0,
+                            reasoning=metric.reason,
+                        )
+                        session.add(metric_score)
+                        session.commit()
+
+                    scores["metadata_precision"] = {
+                        "score": score,
+                        "passed": metric.is_successful(),
+                        "threshold": metric_config.threshold,
+                    }
+
+            # Relationship Traversal Score Metric
+            if "relationship_traversal_score" in metrics_config.tclp_custom:
+                metric_config = metrics_config.tclp_custom["relationship_traversal_score"]
+                if metric_config.enabled:
+                    metric = RelationshipTraversalScoreMetric(
+                        threshold=metric_config.threshold,
+                        expected_concepts=prompt.expected_concepts,
+                    )
+                    score = metric.measure(test_case)
+
+                    with self.db_manager.get_session() as session:
+                        metric_score = MetricScore(
+                            llm_response_id=response_id,
+                            metric_name="relationship_traversal_score",
+                            metric_category="tclp_custom",
+                            score=score,
+                            threshold=metric_config.threshold,
+                            passed=1 if metric.is_successful() else 0,
+                            reasoning=metric.reason,
+                        )
+                        session.add(metric_score)
+                        session.commit()
+
+                    scores["relationship_traversal_score"] = {
                         "score": score,
                         "passed": metric.is_successful(),
                         "threshold": metric_config.threshold,

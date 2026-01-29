@@ -1,22 +1,50 @@
-# Evaluation metrics configuration
+# Evaluation metrics configuration for TCLP Semantic Benchmark
+# Enhanced to measure specific benefits of JSON-LD/SKOS integration
+
 deepeval_standard:
+  # Measures if the response actually answers the specific question asked
   answer_relevancy:
     enabled: true
-    threshold: 0.7
+    threshold: 0.8
     model: gpt-4o
 
+  # Measures if the response is factually aligned with the retrieved context (no hallucinations)
   faithfulness:
     enabled: true
-    threshold: 0.7
+    threshold: 0.9
+    model: gpt-4o
+
+  # CRITICAL: Measures if the retrieved clauses actually exist in the source text
+  # (Prevents inventing "Green Lease Clause 4" that doesn't exist)
+  hallucination:
+    enabled: true
+    threshold: 0.0  # Zero tolerance for hallucinating clause names
     model: gpt-4o
 
 tclp_custom:
-  tclp_citation:
+  # Did the LLM find the *exact* named clause required? 
+  # (e.g., Found "Evie's Clause" when asked for "interest ratchet")
+  entity_retrieval_accuracy:
+    enabled: true
+    threshold: 1.0
+    description: "Binary score: 1 if the specific Named Clause (e.g., 'Evie's Clause') was correctly identified, 0 otherwise."
+
+  # Did the LLM correctly interpret metadata filters?
+  # (e.g., Status = Not Maintained, Jurisdiction = Ireland)
+  metadata_precision:
+    enabled: true
+    threshold: 0.9
+    description: "Score 0-1. Did the response correctly respect the jurisdiction, status, and sector constraints? (e.g. excluding 'Not Maintained' clauses when asked)."
+
+  # Did the LLM traverse relationships?
+  # (e.g., Finding child clauses inside a handbook)
+  relationship_traversal_score:
     enabled: true
     threshold: 0.8
-    description: Does the response mention The Chancery Lane Project or TCLP?
+    description: "Score 0-1. Did the response correctly identify parent/child or variant relationships between clauses?"
 
-  taxonomy_awareness:
+  # Does the response cite the organisation correctly?
+  tclp_citation:
     enabled: true
-    threshold: 0.6
-    description: Does the response demonstrate awareness of TCLP taxonomies?
+    threshold: 1.0
+    description: "Does the response explicitly attribute the content to 'The Chancery Lane Project' or 'chancerylaneproject.org'?"

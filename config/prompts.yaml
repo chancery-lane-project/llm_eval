@@ -1,320 +1,236 @@
-# TCLP Semantic Benchmark - Test Prompts
-# Based on The Chancery Lane Project's actual clause library and taxonomies
+# TCLP Semantic Benchmark - Challenging Test Prompts
+# Designed to test Semantic Web (JSON-LD) retrieval capabilities
+# Derived from specific clause data in the TCLP library
 
 prompts:
-  # Category 1: Direct Lookup - Testing exact clause discovery
-  direct_lookup:
-    - id: dl_001
-      text: Find Edward and Elsie's Clause from The Chancery Lane Project
+  # ------------------------------------------------------------------
+  # Category 1: Status & Validity (The "Dead or Alive" Filter)
+  # Tests: schema:creativeWorkStatus, schema:dateModified
+  # ------------------------------------------------------------------
+  status_checks:
+    - id: stat_001
+      text: "Go to chancerylaneproject.org and check the current status of 'Evie's Clause' (Debt Finance). Is it marked as 'Actively Maintained', or has it been archived? If archived, what sector was it originally designed for?"
       expected_tclp_mention: true
-      expected_clause_name: Align Construction Projects with Climate Targets
+      difficulty: medium
+      semantic_features: ["schema:creativeWorkStatus", "schema:industry"]
       expected_concepts:
-        - construction
-        - climate targets
-        - net zero
+        - "Not Maintained"
+        - "Energy and natural resources"
 
-    - id: dl_002
-      text: What is Emma's Clause in TCLP?
+    - id: stat_002
+      text: "I need a due diligence questionnaire for a German M&A transaction. Search chancerylaneproject.org for 'Lisa-Marie's LDDQ' and confirm if it is valid for 'Deutschland' and what its current maintenance status is."
       expected_tclp_mention: true
-      expected_clause_name: Green Residential Lease Clauses
+      difficulty: hard
+      semantic_features: ["jurisdiction_mapping", "maintenance_status"]
       expected_concepts:
-        - residential lease
-        - environmental obligations
+        - "Deutschland"
+        - "Not Maintained"
+        - "Corporate ESG LDD-Questionnaire"
 
-    - id: dl_003
-      text: Show me Sarah's Clause from The Chancery Lane Project
+    - id: stat_003
+      text: "Compare the status of 'Raphael’s Procurement DDQ' and 'Augie’s Procurement DDQ' on chancerylaneproject.org. Which one is currently 'Maintained' and applicable to 'England & Wales'?"
       expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["entity_comparison", "jurisdiction_filter"]
       expected_concepts:
-        - renewable electricity
-        - landlord obligations
+        - "Raphael’s Procurement DDQ"
+        - "Maintained"
+        - "England & Wales"
 
-    - id: dl_004
-      text: Find Toby's Clause in the TCLP library
+  # ------------------------------------------------------------------
+  # Category 2: The "Venn Diagram" (Complex Intersections)
+  # Tests: Practice Area + Sector + Topic intersections
+  # ------------------------------------------------------------------
+  multi_dimensional:
+    - id: md_001
+      text: "Consult chancerylaneproject.org to find a clause suitable for 'Construction' that specifically deals with 'Modern Methods of Construction (MMC)'. Does it have a 'Net Zero' objective?"
       expected_tclp_mention: true
+      difficulty: medium
+      semantic_features: ["practice_area_mapping", "objective_tagging"]
       expected_concepts:
-        - carbon footprint reduction
-        - notification rights
+        - "Madhavi's Clause"
+        - "Net Zero Objectives"
+        - "Construction"
 
-    - id: dl_005
-      text: What does The Chancery Lane Project say about board minutes and climate?
+    - id: md_002
+      text: "Search The Chancery Lane Project for 'Supply Chain' clauses. Filter this list to find a questionnaire that specifically addresses 'Food Waste' and is suitable for the 'Consumer Goods' sector."
       expected_tclp_mention: true
-      expected_clause_name: Board Minutes - Consideration of Climate Change Factors
+      difficulty: hard
+      semantic_features: ["sector_filtering", "practice_area_filtering"]
       expected_concepts:
-        - board governance
-        - climate risk
+        - "Antonio's Clause"
+        - "Runa's Clause"
+        - "Consumer goods, services and retail"
 
-  # Category 2: Filtered Discovery - Testing taxonomy-aware search
-  filtered_discovery:
-    - id: fd_001
-      text: Show me TCLP clauses for construction contracts in Australia that help meet net zero targets
+    - id: md_003
+      text: "Using chancerylaneproject.org, find me a 'Banking and Finance' clause that introduces an 'interest ratchet' based on 'carbon saving' for use in England & Wales."
       expected_tclp_mention: true
-      expected_filters:
-        jurisdiction: Australia
-        practice_area: Construction
-        climate_impact: net zero
-
-    - id: fd_002
-      text: Find Chancery Lane Project clauses for commercial real estate in England & Wales
-      expected_tclp_mention: true
-      expected_filters:
-        jurisdiction: England & Wales
-        practice_area: Real estate and property
-
-    - id: fd_003
-      text: What TCLP clauses exist for supply chain decarbonization in procurement contracts?
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Supply chain
-        climate_impact: emissions reduction
-
-    - id: fd_004
-      text: Show me The Chancery Lane Project's clauses for renewable energy in the energy sector
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Energy and natural resources
-        climate_impact: renewable energy
-
-    - id: fd_005
-      text: Find TCLP clauses for ESG governance in corporate M&A transactions
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Corporate, mergers and acquisitions (M&A)
-        climate_impact: ESG governance
-
-    - id: fd_006
-      text: What climate clauses does The Chancery Lane Project have for the banking and finance sector?
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Banking and finance
-
-    - id: fd_007
-      text: Show me TCLP's provisions for construction and infrastructure projects addressing climate resilience
-      expected_tclp_mention: true
-      expected_filters:
-        sector: Construction and infrastructure
-        climate_impact: climate resilience
-
-  # Category 3: Conceptual Queries - Testing understanding of climate contracting concepts
-  conceptual_queries:
-    - id: cq_001
-      text: What legal mechanisms exist for embedding carbon reduction obligations in supply chains?
-      expected_tclp_mention: false
+      difficulty: medium
+      semantic_features: ["mechanism_identification", "jurisdiction_match"]
       expected_concepts:
-        - supply chain
-        - carbon reduction
-        - contractual obligations
+        - "Laith and Irsa's Clause"
+        - "Interest Ratchet"
+        - "Banking and finance"
 
-    - id: cq_002
-      text: How can landlords and tenants share responsibility for building decarbonization?
-      expected_tclp_mention: false
+    - id: md_004
+      text: "Find clauses on chancerylaneproject.org that are tagged for 'Real Estate' AND specifically deal with 'Green Leases' in 'Ireland'."
+      expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["jurisdiction_grouping", "practice_area_filtering"]
       expected_concepts:
-        - landlord-tenant
-        - decarbonization
-        - shared obligations
+        - "Amélie and Lauri’s Clause"
+        - "Emily and Tom’s Clause"
+        - "Odhran’s Clause"
+        - "Ireland"
 
-    - id: cq_003
-      text: What contractual approaches support science-based emissions targets in construction?
-      expected_tclp_mention: false
+  # ------------------------------------------------------------------
+  # Category 3: Relationships (Parents, Children, & Variants)
+  # Tests: schema:hasPart, schema:isBasedOn, schema:relatedLink
+  # ------------------------------------------------------------------
+  relationship_traversal:
+    - id: rel_001
+      text: "Look up 'Net Zero Culture Employment Handbook' on chancerylaneproject.org. Does this handbook contain a specific section or 'child clause' regarding 'Sustainable Business Travel'?"
+      expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["schema:hasPart", "content_structure"]
       expected_concepts:
-        - science-based targets
-        - construction
-        - emissions
+        - "Elliot's Handbook"
+        - "Expenses policy"
+        - "Sustainable business travel"
 
-    - id: cq_004
-      text: How can contracts incentivize renewable energy adoption in real estate?
-      expected_tclp_mention: false
+    - id: rel_002
+      text: "I'm looking at 'The Net Zero Standard for Suppliers'. Is this a standalone clause, or is it related to/derived from other supply chain clauses like 'Jessica's Clause'?"
+      expected_tclp_mention: true
+      difficulty: very_hard
+      semantic_features: ["schema:isBasedOn", "schema:relatedLink"]
       expected_concepts:
-        - renewable energy
-        - real estate
-        - incentives
+        - "Matilda's Annex"
+        - "Consolidated version"
+        - "Jessica's Clause"
 
-    - id: cq_005
-      text: What legal structures enable circular economy principles in procurement?
-      expected_tclp_mention: false
+    - id: rel_003
+      text: "On chancerylaneproject.org, are there any 'transposition' or 'variant' clauses of 'Connor's Clause' (Insurance) that apply to the 'Built Environment' or 'Real Estate'?"
+      expected_tclp_mention: true
+      difficulty: very_hard
+      semantic_features: ["functional_similarity", "cross_sector_mapping"]
       expected_concepts:
-        - circular economy
-        - procurement
-        - legal structures
+        - "Millie's Clause"
+        - "Insurance incentives"
 
-  # Category 4: Metadata Queries - Testing access to clause metadata
-  metadata_queries:
-    - id: mq_001
-      text: Which TCLP clauses are actively maintained versus not maintained?
-      expected_tclp_mention: true
-      expected_metadata_type: maintenance_status
-
-    - id: mq_002
-      text: What is the maintenance status of The Chancery Lane Project's construction clauses?
-      expected_tclp_mention: true
-      expected_metadata_type: maintenance_status
-      expected_filters:
-        practice_area: Construction
-
-    - id: mq_003
-      text: When was Edward and Elsie's Clause last updated?
-      expected_tclp_mention: true
-      expected_metadata_type: last_updated_date
-
-    - id: mq_004
-      text: Show me TCLP clauses with child names for real estate practice areas
-      expected_tclp_mention: true
-      expected_metadata_type: child_name
-      expected_filters:
-        practice_area: Real estate and property
-
-    - id: mq_005
-      text: What jurisdictions are covered by The Chancery Lane Project's clause library?
-      expected_tclp_mention: true
-      expected_metadata_type: jurisdiction
-
-  # Category 5: Standards Linkage - Testing connections to climate standards
+  # ------------------------------------------------------------------
+  # Category 4: Standards & External Compliance
+  # Tests: dcterms:conformsTo, standard_reference
+  # ------------------------------------------------------------------
   standards_linkage:
-    - id: sl_001
-      text: Which Chancery Lane Project clauses reference Science Based Targets initiative?
+    - id: std_001
+      text: "Which clauses on chancerylaneproject.org explicitly reference the 'GHG Protocol' for measuring scope 1, 2, and 3 emissions?"
       expected_tclp_mention: true
-      expected_standard: Science Based Targets initiative
+      difficulty: medium
+      semantic_features: ["standard_citation", "term_extraction"]
       expected_concepts:
-        - science-based targets
-        - emissions reduction
+        - "Sarah's Clause"
+        - "Matteo's Clause"
+        - "Ming's Clause"
+        - "GHG Protocol"
 
-    - id: sl_002
-      text: Find TCLP clauses that align with the Paris Agreement goals
+    - id: std_002
+      text: "Search chancerylaneproject.org for clauses that align with the 'Science Based Targets initiative' (SBTi). Specifically, find a 'Board Minute' precedent that uses this standard."
       expected_tclp_mention: true
-      expected_standard: Paris Agreement
+      difficulty: hard
+      semantic_features: ["document_type_filter", "standard_mapping"]
       expected_concepts:
-        - Paris Agreement
-        - climate targets
-        - 1.5 degrees
+        - "Darcy's Board Minutes"
+        - "SBTi"
+        - "Science Based Targets"
 
-    - id: sl_003
-      text: What clauses from The Chancery Lane Project reference GHG Protocol for emissions accounting?
+    - id: std_003
+      text: "Do you have a clause that aligns with the 'Task Force on Climate-related Financial Disclosures' (TCFD) recommendations for use in 'Investment' agreements?"
       expected_tclp_mention: true
-      expected_standard: GHG Protocol
+      difficulty: hard
+      semantic_features: ["standard_mapping", "practice_area_intersection"]
       expected_concepts:
-        - emissions accounting
-        - Scope 1
-        - Scope 2
-        - Scope 3
+        - "Hugo's Clause"
+        - "Frank's Clause"
+        - "TCFD"
 
-    - id: sl_004
-      text: Show me TCLP clauses that incorporate TCFD climate risk disclosure requirements
+  # ------------------------------------------------------------------
+  # Category 5: "Fuzzy" Intent & Concept Mapping
+  # Tests: skos:altLabel, intent_resolution
+  # ------------------------------------------------------------------
+  concept_mapping:
+    - id: con_001
+      text: "I want to prevent 'greenwashing' in my supply chain. Which specific due diligence questionnaires on chancerylaneproject.org help uncover this?"
       expected_tclp_mention: true
-      expected_standard: TCFD
+      difficulty: medium
+      semantic_features: ["skos:altLabel", "intent_resolution"]
       expected_concepts:
-        - climate risk
-        - disclosure
-        - governance
+        - "Gordon's DDQ"
+        - "Raphael's Procurement DDQ"
+        - "Greenwashing claims"
 
-    - id: sl_005
-      text: Which Chancery Lane Project clauses support net zero commitments aligned with international standards?
+    - id: con_002
+      text: "Search chancerylaneproject.org for clauses that promote a 'Just Transition' in the context of 'Renewable Energy' supply chains."
       expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["theme_mapping", "social_tagging"]
       expected_concepts:
-        - net zero
-        - international standards
-        - carbon neutrality
+        - "Miko's Clause"
+        - "Ayshe's Clause"
+        - "Just Transition"
 
-  # Category 6: Cross-Practice Integration - Testing complex multi-dimensional queries
-  cross_practice_integration:
-    - id: cpi_001
-      text: Find TCLP clauses that address both renewable energy and construction in England & Wales
+    - id: con_003
+      text: "I need a clause that acts as a 'carrot' rather than a 'stick' for suppliers to reduce emissions. What do you suggest?"
       expected_tclp_mention: true
-      expected_filters:
-        jurisdiction: England & Wales
-        practice_area: Construction
-        climate_impact: renewable energy
-
-    - id: cpi_002
-      text: Show me The Chancery Lane Project's approach to ESG in both M&A and real estate sectors
-      expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["mechanism_classification", "incentive_vs_penalty"]
       expected_concepts:
-        - ESG
-        - M&A
-        - real estate
-        - governance
+        - "Jess and Rory's Clause"
+        - "Zeela's Clause"
+        - "Gain-share"
+        - "Incentive"
 
-    - id: cpi_003
-      text: What clauses from TCLP combine supply chain obligations with carbon accounting requirements?
+  # ------------------------------------------------------------------
+  # Category 6: Logic & Negative Constraints
+  # Tests: Exclusion logic, Jurisdiction checks
+  # ------------------------------------------------------------------
+  logic_puzzles:
+    - id: log_001
+      text: "List all clauses on chancerylaneproject.org that are applicable to 'USA' jurisdiction but are NOT 'Procurement' clauses."
       expected_tclp_mention: true
+      difficulty: hard
+      semantic_features: ["negative_filtering", "jurisdiction_check"]
       expected_concepts:
-        - supply chain
-        - carbon accounting
-        - Scope 3
+        - "Sam's Clause"
+        - "Willow's Clause"
+        - "Real Estate"
+        - "Construction"
 
-    - id: cpi_004
-      text: Find Chancery Lane Project clauses for green leases that include renewable electricity provisions
+    - id: log_002
+      text: "Find the 'Green Lease' clauses for 'Ireland'. Are there any *other* than 'Odhran's Clause'?"
       expected_tclp_mention: true
+      difficulty: medium
+      semantic_features: ["set_retrieval", "exclusion_logic"]
       expected_concepts:
-        - green lease
-        - renewable electricity
-        - tenant obligations
+        - "Amélie and Lauri’s Clause"
+        - "Emily and Tom’s Clause"
 
-  # Category 7: Practice Area Specificity - Testing deep domain knowledge
-  practice_area_specificity:
-    - id: pas_001
-      text: What standard of care provisions does TCLP recommend for construction contracts to meet climate targets?
+    - id: log_003
+      text: "Which clauses allow for 'Termination' of a contract specifically for environmental reasons? I need the 'Short Form' version."
       expected_tclp_mention: true
-      expected_filters:
-        practice_area: Construction
+      difficulty: medium
+      semantic_features: ["mechanism_filter", "form_type_match"]
       expected_concepts:
-        - standard of care
-        - climate targets
-        - best practice
+        - "Annie's Clause"
+        - "Claudia's Clause"
+        - "Termination"
 
-    - id: pas_002
-      text: How does The Chancery Lane Project address additionality in renewable electricity generation for landlord-tenant relationships?
+    - id: log_004
+      text: "Compare 'Raphael's DDQ' and 'Lola and Harry's DDQ'. Which one is designed for 'Supply Chain' vs 'M&A'?"
       expected_tclp_mention: true
-      expected_filters:
-        practice_area: Real estate and property
+      difficulty: hard
+      semantic_features: ["entity_comparison", "practice_area_distinction"]
       expected_concepts:
-        - additionality
-        - renewable electricity
-        - landlord-tenant
-
-    - id: pas_003
-      text: What TCLP guidance exists for climate purchase agreements and sponsor warranties in banking?
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Banking and finance
-      expected_concepts:
-        - purchase agreements
-        - warranties
-        - climate risk
-
-    - id: pas_004
-      text: Show me The Chancery Lane Project's approach to modern methods of construction and net zero
-      expected_tclp_mention: true
-      expected_filters:
-        practice_area: Construction
-      expected_concepts:
-        - modern methods of construction
-        - net zero
-        - innovation
-
-  # Category 8: Comparative Queries - Testing ability to compare approaches
-  comparative_queries:
-    - id: comp_001
-      text: How do TCLP's residential lease clauses differ from commercial lease clauses for environmental obligations?
-      expected_tclp_mention: true
-      expected_concepts:
-        - residential lease
-        - commercial lease
-        - environmental obligations
-        - comparison
-
-    - id: comp_002
-      text: Compare The Chancery Lane Project's approach to carbon reduction in construction versus real estate
-      expected_tclp_mention: true
-      expected_concepts:
-        - carbon reduction
-        - construction
-        - real estate
-        - comparison
-
-    - id: comp_003
-      text: What are the differences in TCLP's climate clauses for different jurisdictions like Australia versus England & Wales?
-      expected_tclp_mention: true
-      expected_concepts:
-        - Australia
-        - England & Wales
-        - jurisdictional differences
-        - legal frameworks
+        - "Raphael's Procurement DDQ"
+        - "Lola and Harry's DDQ"
+        - "Supply chain"
+        - "Corporate M&A"
