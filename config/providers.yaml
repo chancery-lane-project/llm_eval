@@ -47,3 +47,24 @@ gemini:
     max_attempts: 3
     exponential_base: 2
     max_wait_seconds: 60
+
+openrouter:
+  enabled: true
+  api_endpoint: "https://openrouter.ai/api/v1/chat/completions"
+  models:
+    - "anthropic/claude-opus-4-5-20251101:online"
+    - "openai/gpt-4o:online"
+    - "google/gemini-2.0-flash-exp:online"
+  max_tokens: 1000
+  temperature: 0.1
+  web_search:
+    enabled: true
+    max_results: 5
+    custom_search_prompt: "Search chancerylaneproject.org for legal clauses matching this query. Include exact clause names, maintenance status (schema:creativeWorkStatus), jurisdiction, practice area, and any semantic relationships (parent clauses via schema:hasPart, variants via schema:isBasedOn, related standards like SBTi or GHG Protocol)."
+  rate_limit:
+    requests_per_minute: 50
+    tokens_per_minute: 100000
+  retry:
+    max_attempts: 3
+    exponential_base: 2
+    max_wait_seconds: 60

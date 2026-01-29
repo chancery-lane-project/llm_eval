@@ -43,7 +43,7 @@ class ConfigLoader:
         # Extract only provider configs (not 'search' section)
         provider_data = {
             k: v for k, v in data.items()
-            if k in ["openai", "anthropic", "gemini"]
+            if k in ["openai", "anthropic", "gemini", "openrouter"]
         }
         return cls._validate_config(provider_data, ProvidersConfig)
 
@@ -52,3 +52,9 @@ class ConfigLoader:
         """Load and validate metrics configuration."""
         data = cls._load_yaml(file_path)
         return cls._validate_config(data, MetricsConfig)
+
+
+# Convenience functions for direct access
+def load_providers_config(file_path: Path) -> ProvidersConfig:
+    """Load and validate providers configuration."""
+    return ConfigLoader.load_providers(file_path)

@@ -85,6 +85,16 @@ A working tool that can:
 - **Secrets**: python-dotenv for API key management
 - **Database**: SQLite (simple, portable, version-controllable)
 
+## Environment Variables
+
+Required API keys (configured in `.env`):
+- `OPENAI_API_KEY`: API key for OpenAI models
+- `ANTHROPIC_API_KEY`: API key for Anthropic Claude models
+- `GOOGLE_API_KEY`: API key for Google Gemini models
+- `OPENROUTER_API_KEY`: API key for OpenRouter unified API access
+- `GOOGLE_SEARCH_API_KEY`: API key for Google Custom Search (web search functionality)
+- `GOOGLE_SEARCH_ENGINE_ID`: Search engine ID for Google Custom Search
+
 ## Future Integration Points
 
 - Neo4j knowledge graph (for ground truth validation)

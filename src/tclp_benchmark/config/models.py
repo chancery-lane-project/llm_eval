@@ -1,5 +1,5 @@
 """Pydantic models for configuration validation."""
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Dict, List, Any, Optional
 
 
@@ -79,12 +79,36 @@ class MetricConfig(BaseModel):
     criteria: Optional[str] = None
 
 
+class WebSearchConfig(BaseModel):
+    """Configuration for OpenRouter web search plugin"""
+    enabled: bool
+    max_results: int = Field(default=5, ge=1, le=20)
+    custom_search_prompt: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class OpenRouterConfig(BaseModel):
+    """Configuration for OpenRouter LLM provider"""
+    enabled: bool
+    api_endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    models: List[str]
+    max_tokens: int = Field(ge=1)
+    temperature: float = Field(ge=0.0, le=2.0)
+    web_search: WebSearchConfig
+    rate_limit: Optional[RateLimitConfig] = None
+    retry: Optional[RetryConfig] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ProvidersConfig(BaseModel):
     """Configuration for all LLM providers."""
 
     openai: Optional[ProviderConfig] = None
     anthropic: Optional[ProviderConfig] = None
     gemini: Optional[ProviderConfig] = None
+    openrouter: Optional[OpenRouterConfig] = None
 
 
 class MetricsConfig(BaseModel):
