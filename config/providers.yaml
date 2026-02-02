@@ -52,9 +52,9 @@ openrouter:
   enabled: true
   api_endpoint: "https://openrouter.ai/api/v1/chat/completions"
   models:
-    - "anthropic/claude-opus-4-5-20251101:online"
+    - "anthropic/claude-opus-4.5:online"
     - "openai/gpt-4o:online"
-    - "google/gemini-2.0-flash-exp:online"
+    - "google/gemini-3-flash-preview:online"
   max_tokens: 1000
   temperature: 0.1
   web_search:

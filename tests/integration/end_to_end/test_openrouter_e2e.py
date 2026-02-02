@@ -26,13 +26,15 @@ def test_env(tmp_path, monkeypatch):
     prompts_config.write_text("""
 prompts:
   direct_lookup:
-    - text: "Find the net zero carbon commitment clause from The Chancery Lane Project"
+    - id: test_direct_001
+      text: "Find the net zero carbon commitment clause from The Chancery Lane Project"
       expected_tclp_mention: true
       expected_terms:
         - "net zero"
         - "carbon"
   status_checks:
-    - text: "What is the maintenance status of the biodiversity clause on chancerylaneproject.org?"
+    - id: test_status_001
+      text: "What is the maintenance status of the biodiversity clause on chancerylaneproject.org?"
       expected_tclp_mention: true
       expected_terms:
         - "biodiversity"
@@ -65,16 +67,13 @@ openrouter:
     # Create metrics config
     metrics_config = config_dir / "metrics.yaml"
     metrics_config.write_text("""
-metrics:
-  tclp_custom:
-    tclp_citation:
-      enabled: true
-      threshold: 0.5
-      weight: 1.0
-    taxonomy_awareness:
-      enabled: true
-      threshold: 0.5
-      weight: 1.0
+tclp_custom:
+  tclp_citation:
+    enabled: true
+    threshold: 0.5
+  taxonomy_awareness:
+    enabled: true
+    threshold: 0.5
 """)
 
     # Set up database
@@ -123,7 +122,7 @@ def test_full_openrouter_evaluation_run(runner, test_env):
     assert "Evaluation complete" in result.output or "completed" in result.output.lower()
 
     # Verify database contains results
-    db_manager = DatabaseManager(str(test_env["db_path"]))
+    db_manager = DatabaseManager(f"sqlite:///{test_env['db_path']}")
 
     with db_manager.get_session() as session:
         run = session.query(EvaluationRun).filter_by(
@@ -193,14 +192,13 @@ def test_openrouter_web_search_enabled(runner, test_env):
             "--prompts-config", str(test_env["prompts_config"]),
             "--providers-config", str(test_env["providers_config"]),
             "--metrics-config", str(test_env["metrics_config"]),
-            "--verbose",
         ],
     )
 
     assert result.exit_code == 0
 
     # Verify in database
-    db_manager = DatabaseManager(str(test_env["db_path"]))
+    db_manager = DatabaseManager(f"sqlite:///{test_env['db_path']}")
 
     with db_manager.get_session() as session:
         run = session.query(EvaluationRun).filter_by(
@@ -246,9 +244,8 @@ def test_openrouter_report_generation(runner, test_env):
     report_result = runner.invoke(
         cli,
         [
-            "report",
+            "report-single",
             "--version-tag", "report-test",
-            "--single",
             "--format", "html",
             "--output", str(report_path),
         ],
@@ -281,8 +278,11 @@ openai:
       temperature: 0.1
   rate_limit:
     requests_per_minute: 50
+    tokens_per_minute: 100000
   retry:
     max_attempts: 3
+    exponential_base: 2
+    max_wait_seconds: 60
 
 openrouter:
   enabled: true
@@ -296,8 +296,11 @@ openrouter:
     max_results: 5
   rate_limit:
     requests_per_minute: 50
+    tokens_per_minute: 100000
   retry:
     max_attempts: 3
+    exponential_base: 2
+    max_wait_seconds: 60
 """)
 
     # Run baseline with OpenAI

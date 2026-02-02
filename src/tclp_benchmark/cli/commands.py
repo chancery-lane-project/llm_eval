@@ -28,6 +28,11 @@ def cli():
     help="Version tag for this evaluation run (e.g., 'pre-jsonld', 'post-jsonld-v1')",
 )
 @click.option(
+    "--description",
+    type=str,
+    help="Optional description for this evaluation run",
+)
+@click.option(
     "--prompts-config",
     type=click.Path(exists=True, path_type=Path),
     default=Path("config/prompts.yaml"),
@@ -56,7 +61,7 @@ def cli():
     help="Comma-separated list of providers to use (e.g., 'openai,anthropic,openrouter'). "
          "Defaults to all enabled providers in config.",
 )
-def run(version_tag, prompts_config, providers_config, metrics_config, category, providers):
+def run(version_tag, description, prompts_config, providers_config, metrics_config, category, providers):
     """Run evaluation with test prompts against LLM providers."""
     console.print(f"[bold blue]Running evaluation:[/bold blue] {version_tag}")
     console.print(f"  Prompts config: {prompts_config}")
@@ -101,6 +106,7 @@ def run(version_tag, prompts_config, providers_config, metrics_config, category,
                 prompts_config=prompts_cfg,
                 providers_config=providers_cfg,
                 metrics_config=metrics_cfg,
+                description=description,
                 category_filter=category,
                 provider_filter=provider_filter,
             )
