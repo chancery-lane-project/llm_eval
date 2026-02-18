@@ -40,6 +40,6 @@ models:
   - allenai/olmo-2-0325-32b-instruct
 
 settings:
-  max_tokens: 1000
+  max_tokens: 2000
   temperature: 0
   delay_between_requests: 3  # seconds, ~20 req/min

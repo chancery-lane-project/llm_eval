@@ -81,6 +81,17 @@ def load_ground_truth(clauses_dir: Path) -> dict:
     return {"names": names, "total_clauses": total}
 
 
+def _normalise(text: str) -> str:
+    """Normalise punctuation separators for fuzzy matching."""
+    # Replace em-dash, en-dash, hyphen-space with colon-space
+    text = re.sub(r"\s*[–—]\s*", ": ", text)
+    # Replace " - " (spaced hyphen) with ": "
+    text = re.sub(r"\s+-\s+", ": ", text)
+    # Collapse multiple spaces
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
+
+
 # Keywords that flag something as a "clause-like" name (for hallucination detection)
 CLAUSE_KEYWORDS = re.compile(
     r"\b(clause|ddq|handbook|annex|minutes|protocol|guide|checklist|questionnaire)\b",
@@ -93,6 +104,7 @@ def detect_awareness(text: str) -> bool:
     text_lower = text.lower()
     return (
         "the chancery lane project" in text_lower
+        or "chancery lane project" in text_lower
         or "chancerylaneproject.org" in text_lower
         or bool(re.search(r"\btclp\b", text_lower))
     )
@@ -116,9 +128,13 @@ def score_enumeration(text: str, ground_truth_names: set) -> dict:
         }
     """
     text_lower = text.lower()
+    text_normalised = _normalise(text_lower)
 
-    # Find which ground truth names appear in the response
-    real_matches = [name for name in ground_truth_names if name in text_lower]
+    # Find which ground truth names appear in the response (original or normalised)
+    real_matches = [
+        name for name in ground_truth_names
+        if name in text_lower or _normalise(name) in text_normalised
+    ]
 
     # Extract candidate names: lines that contain clause-like keywords
     candidates = []
@@ -131,10 +147,15 @@ def score_enumeration(text: str, ground_truth_names: set) -> dict:
             candidates.append(cleaned.lower())
 
     # Hallucinations: candidates not matching any ground truth name
+    # Check both original and normalised forms so punctuation variants don't
+    # produce false hallucinations (e.g. dash vs colon as separator).
     hallucinations = [
         c for c in candidates
         if c not in ground_truth_names
         and not any(c in gt or gt in c for gt in ground_truth_names)
+        and _normalise(c) not in {_normalise(gt) for gt in ground_truth_names}
+        and not any(_normalise(c) in _normalise(gt) or _normalise(gt) in _normalise(c)
+                    for gt in ground_truth_names)
     ]
     # Deduplicate
     hallucinations = list(dict.fromkeys(hallucinations))

@@ -96,6 +96,11 @@ def test_detect_awareness_is_case_insensitive():
     assert detect_awareness(text) is True
 
 
+def test_detect_awareness_finds_name_without_article():
+    text = "Chancery Lane Project has published several clauses."
+    assert detect_awareness(text) is True
+
+
 # --- score_enumeration ---
 
 def test_score_enumeration_counts_real_clauses():
@@ -204,3 +209,11 @@ def test_generate_report_contains_per_model_detail():
     results = [_make_result("openai/gpt-4o", True, 3, 1)]
     report = generate_report(results, total_clauses=183, run_date="2026-02-18")
     assert "Some response text." in report  # awareness response verbatim
+
+
+def test_score_enumeration_handles_dash_separator():
+    ground_truth = {"board minutes: consideration of climate change factors"}
+    text = "- Board Minutes - Consideration of Climate Change Factors"
+    result = score_enumeration(text, ground_truth)
+    assert result["real_count"] == 1
+    assert result["hallucination_count"] == 0
