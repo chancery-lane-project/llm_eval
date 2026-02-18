@@ -10,6 +10,7 @@ Usage:
 Requirements:
     OPENROUTER_API_KEY in .env
 """
+import os
 import re
 import sys
 import asyncio
@@ -382,8 +383,6 @@ async def eval_model(
 
 async def run_eval(models: list, settings: dict, dry_run: bool = False):
     """Main evaluation loop."""
-    import os
-
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         console.print("[red]Error: OPENROUTER_API_KEY not set in .env[/red]")
@@ -436,7 +435,6 @@ async def run_eval(models: list, settings: dict, dry_run: bool = False):
             )
 
             progress.advance(task)
-            await asyncio.sleep(delay)
 
     # Write report
     REPORTS_DIR.mkdir(exist_ok=True)
