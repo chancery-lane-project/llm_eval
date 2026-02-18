@@ -149,3 +149,147 @@ def score_enumeration(text: str, ground_truth_names: set) -> dict:
         "hallucinations": hallucinations,
         "accuracy": accuracy,
     }
+
+
+@dataclass
+class ModelResult:
+    """Result of running both prompts against a single model."""
+    model_id: str
+    awareness_response: str
+    enumeration_response: str
+    knows_tclp: bool
+    real_count: int
+    real_matches: list
+    hallucination_count: int
+    hallucinations: list
+    accuracy: Optional[float]
+    error: Optional[str] = None
+
+
+def generate_report(
+    results: list,
+    total_clauses: int,
+    run_date: str,
+) -> str:
+    """Generate markdown report from eval results."""
+    lines = []
+
+    # Header
+    lines.append(f"# TCLP World Knowledge Eval")
+    lines.append(f"")
+    lines.append(f"**Date:** {run_date}  ")
+    lines.append(f"**Models tested:** {len(results)}  ")
+    lines.append(f"**Ground truth clauses:** {total_clauses}  ")
+    lines.append(f"**Method:** Pure training knowledge (no web search)  ")
+    lines.append(f"")
+
+    # --- Statistical Overview ---
+    knows_count = sum(1 for r in results if r.knows_tclp)
+    knows_pct = round(knows_count / len(results) * 100) if results else 0
+    real_counts = [r.real_count for r in results if not r.error]
+    mean_clauses = round(sum(real_counts) / len(real_counts), 1) if real_counts else 0
+    sorted_by_real = sorted(results, key=lambda r: r.real_count, reverse=True)
+    best = sorted_by_real[0] if sorted_by_real else None
+    # Most accurate: highest accuracy among models that found >=3 clauses
+    accurate_candidates = [r for r in results if r.real_count >= 3 and r.accuracy is not None]
+    most_accurate = max(accurate_candidates, key=lambda r: r.accuracy) if accurate_candidates else None
+
+    lines.append(f"## Statistical Overview")
+    lines.append(f"")
+    lines.append(f"| Metric | Value |")
+    lines.append(f"|--------|-------|")
+    lines.append(f"| Models that know TCLP | {knows_count}/{len(results)} ({knows_pct}%) |")
+    lines.append(f"| Mean clauses found (real) | {mean_clauses} |")
+    lines.append(f"| Median clauses found | {_median(real_counts)} |")
+    if best:
+        lines.append(f"| Best performer (most clauses) | {best.model_id} ({best.real_count} clauses) |")
+    if most_accurate:
+        lines.append(f"| Most accurate (fewest hallucinations) | {most_accurate.model_id} ({round(most_accurate.accuracy * 100)}%) |")
+    lines.append(f"")
+
+    # Family breakdown
+    families = {}
+    for r in results:
+        family = r.model_id.split("/")[0]
+        if family not in families:
+            families[family] = {"total": 0, "aware": 0, "clauses": []}
+        families[family]["total"] += 1
+        if r.knows_tclp:
+            families[family]["aware"] += 1
+        families[family]["clauses"].append(r.real_count)
+
+    lines.append(f"### By Model Family")
+    lines.append(f"")
+    lines.append(f"| Family | Models | Aware | Avg Clauses |")
+    lines.append(f"|--------|--------|-------|-------------|")
+    for family, data in sorted(families.items()):
+        avg = round(sum(data["clauses"]) / len(data["clauses"]), 1) if data["clauses"] else 0
+        lines.append(f"| {family} | {data['total']} | {data['aware']} | {avg} |")
+    lines.append(f"")
+
+    # --- Summary Table ---
+    lines.append(f"## Results by Model")
+    lines.append(f"")
+    lines.append(f"Sorted by clauses found (real), descending.")
+    lines.append(f"")
+    lines.append(f"| Model | Knows TCLP | Clauses Found | Real | Hallucinated | Accuracy |")
+    lines.append(f"|-------|-----------|---------------|------|--------------|----------|")
+
+    for r in sorted_by_real:
+        if r.error:
+            lines.append(f"| {r.model_id} | ⚠ Error | — | — | — | — |")
+            continue
+        aware = "✓" if r.knows_tclp else "✗"
+        acc = f"{round(r.accuracy * 100)}%" if r.accuracy is not None else "—"
+        lines.append(
+            f"| {r.model_id} | {aware} | {r.real_count + r.hallucination_count} "
+            f"| {r.real_count} | {r.hallucination_count} | {acc} |"
+        )
+    lines.append(f"")
+
+    # --- Per-model detail ---
+    lines.append(f"## Per-Model Detail")
+    lines.append(f"")
+
+    for r in sorted_by_real:
+        lines.append(f"### {r.model_id}")
+        lines.append(f"")
+        if r.error:
+            lines.append(f"**Error:** {r.error}")
+            lines.append(f"")
+            continue
+
+        aware = "Yes" if r.knows_tclp else "No"
+        lines.append(f"**Knows TCLP:** {aware}  ")
+        lines.append(f"**Real clauses:** {r.real_count}  ")
+        lines.append(f"**Hallucinations:** {r.hallucination_count}  ")
+        if r.real_matches:
+            lines.append(f"**Matched:** {', '.join(r.real_matches[:10])}"
+                         + (" …" if len(r.real_matches) > 10 else ""))
+        lines.append(f"")
+        lines.append(f"<details>")
+        lines.append(f"<summary>Awareness response</summary>")
+        lines.append(f"")
+        lines.append(r.awareness_response)
+        lines.append(f"")
+        lines.append(f"</details>")
+        lines.append(f"")
+        lines.append(f"<details>")
+        lines.append(f"<summary>Enumeration response</summary>")
+        lines.append(f"")
+        lines.append(r.enumeration_response)
+        lines.append(f"")
+        lines.append(f"</details>")
+        lines.append(f"")
+
+    return "\n".join(lines)
+
+
+def _median(values: list) -> float:
+    """Return median of a list of numbers."""
+    if not values:
+        return 0
+    s = sorted(values)
+    n = len(s)
+    mid = n // 2
+    return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2

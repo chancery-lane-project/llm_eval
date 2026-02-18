@@ -132,3 +132,71 @@ def test_score_enumeration_accuracy_none_when_nothing_found():
     text = "No relevant clauses found."
     result = score_enumeration(text, ground_truth)
     assert result["accuracy"] is None
+
+
+# --- ModelResult + generate_report ---
+
+from world_knowledge_eval import ModelResult, generate_report
+
+
+def _make_result(model_id, knows_tclp, real_count, hallucination_count):
+    return ModelResult(
+        model_id=model_id,
+        awareness_response="Some response text.",
+        enumeration_response="- Annie's Clause\n- Fake Clause",
+        knows_tclp=knows_tclp,
+        real_count=real_count,
+        real_matches=["annie's clause"] * real_count,
+        hallucination_count=hallucination_count,
+        hallucinations=["fake clause"] * hallucination_count,
+        accuracy=(real_count / (real_count + hallucination_count))
+            if (real_count + hallucination_count) > 0 else None,
+        error=None,
+    )
+
+
+def test_generate_report_contains_model_ids():
+    results = [
+        _make_result("openai/gpt-4o", True, 5, 1),
+        _make_result("mistralai/mistral-7b-instruct", False, 0, 0),
+    ]
+    report = generate_report(results, total_clauses=183, run_date="2026-02-18")
+    assert "openai/gpt-4o" in report
+    assert "mistralai/mistral-7b-instruct" in report
+
+
+def test_generate_report_contains_statistics_section():
+    results = [
+        _make_result("openai/gpt-4o", True, 5, 1),
+        _make_result("mistralai/mistral-7b-instruct", False, 0, 0),
+    ]
+    report = generate_report(results, total_clauses=183, run_date="2026-02-18")
+    assert "Statistical Overview" in report
+    assert "50%" in report  # 1 of 2 models knows TCLP
+
+
+def test_generate_report_sorted_by_clauses_found():
+    results = [
+        _make_result("model-a", True, 2, 0),
+        _make_result("model-b", True, 10, 1),
+        _make_result("model-c", False, 0, 0),
+    ]
+    report = generate_report(results, total_clauses=183, run_date="2026-02-18")
+    # model-b should appear before model-a in the table
+    assert report.index("model-b") < report.index("model-a")
+
+
+def test_generate_report_shows_check_and_cross():
+    results = [
+        _make_result("aware-model", True, 3, 1),
+        _make_result("unaware-model", False, 0, 0),
+    ]
+    report = generate_report(results, total_clauses=183, run_date="2026-02-18")
+    assert "✓" in report  # knows TCLP
+    assert "✗" in report  # doesn't know TCLP
+
+
+def test_generate_report_contains_per_model_detail():
+    results = [_make_result("openai/gpt-4o", True, 3, 1)]
+    report = generate_report(results, total_clauses=183, run_date="2026-02-18")
+    assert "Some response text." in report  # awareness response verbatim
