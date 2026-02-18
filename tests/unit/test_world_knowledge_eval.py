@@ -6,7 +6,13 @@ from pathlib import Path
 # Add scripts/ to path so we can import the standalone script
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
-from world_knowledge_eval import load_ground_truth, detect_awareness, score_enumeration
+from world_knowledge_eval import (
+    load_ground_truth,
+    detect_awareness,
+    score_enumeration,
+    ModelResult,
+    generate_report,
+)
 
 
 def test_load_ground_truth_returns_dict_with_names_set(tmp_path):
@@ -135,8 +141,6 @@ def test_score_enumeration_accuracy_none_when_nothing_found():
 
 
 # --- ModelResult + generate_report ---
-
-from world_knowledge_eval import ModelResult, generate_report
 
 
 def _make_result(model_id, knows_tclp, real_count, hallucination_count):
