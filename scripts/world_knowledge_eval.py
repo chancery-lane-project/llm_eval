@@ -93,7 +93,6 @@ def detect_awareness(text: str) -> bool:
     text_lower = text.lower()
     return (
         "the chancery lane project" in text_lower
-        or "chancery lane project" in text_lower
         or "chancerylaneproject.org" in text_lower
         or bool(re.search(r"\btclp\b", text_lower))
     )
@@ -127,7 +126,7 @@ def score_enumeration(text: str, ground_truth_names: set) -> dict:
         # Strip list markers (-, *, 1., •, etc.)
         cleaned = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", line).strip()
         # Strip surrounding quotes
-        cleaned = cleaned.strip("\"'")
+        cleaned = cleaned.strip("\"'\u201c\u201d\u2018\u2019")
         if cleaned and CLAUSE_KEYWORDS.search(cleaned):
             candidates.append(cleaned.lower())
 
