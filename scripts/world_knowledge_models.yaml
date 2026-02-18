@@ -1,0 +1,46 @@
+# World Knowledge Eval — Model List
+# All models run WITHOUT web search (pure training knowledge)
+
+models:
+  # Frontier / commercial
+  - openai/gpt-4o
+  - openai/gpt-4o-mini
+  - openai/gpt-4-turbo
+  - openai/gpt-3.5-turbo
+  - openai/o1-mini
+  - anthropic/claude-3.5-sonnet
+  - anthropic/claude-3-opus
+  - anthropic/claude-3-haiku
+  - anthropic/claude-3.5-haiku
+  - google/gemini-2.0-flash-001
+  - google/gemini-pro-1.5
+  - google/gemini-flash-1.5
+  - x-ai/grok-2
+  - amazon/nova-pro-v1
+
+  # Large open-weight
+  - meta-llama/llama-3.3-70b-instruct
+  - meta-llama/llama-3.1-405b-instruct
+  - meta-llama/llama-3.1-70b-instruct
+  - mistralai/mistral-large
+  - mistralai/mixtral-8x22b-instruct
+  - mistralai/mixtral-8x7b-instruct
+  - qwen/qwen-2.5-72b-instruct
+  - cohere/command-r-plus
+  - cohere/command-r
+  - databricks/dbrx-instruct
+  - nvidia/llama-3.1-nemotron-70b-instruct
+  - deepseek/deepseek-chat
+  - deepseek/deepseek-r1
+
+  # Smaller models
+  - mistralai/mistral-7b-instruct
+  - microsoft/phi-4
+  - qwen/qwen-2.5-7b-instruct
+  - allenai/olmo-2-0325-32b-instruct
+  - 01-ai/yi-large
+
+settings:
+  max_tokens: 1000
+  temperature: 0
+  delay_between_requests: 3  # seconds, ~20 req/min
