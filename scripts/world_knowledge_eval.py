@@ -292,3 +292,186 @@ def _median(values: list) -> float:
     n = len(s)
     mid = n // 2
     return s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+PROMPT_AWARENESS = (
+    "What is The Chancery Lane Project? "
+    "Please describe what it does, what it publishes, and who it is aimed at."
+)
+
+PROMPT_ENUMERATION = (
+    "List every clause, guide, questionnaire, handbook, or other resource "
+    "published by The Chancery Lane Project that you know about. "
+    "For each one, give its full name. "
+    "Do not search the web — use only your training knowledge."
+)
+
+
+async def call_model(
+    client: AsyncOpenAI,
+    model_id: str,
+    prompt: str,
+    max_tokens: int,
+    temperature: float,
+) -> str:
+    """
+    Call a model via OpenRouter and return the response text.
+    Raises on API error (caller handles).
+    """
+    response = await client.chat.completions.create(
+        model=model_id,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return response.choices[0].message.content or ""
+
+
+async def eval_model(
+    client: AsyncOpenAI,
+    model_id: str,
+    ground_truth_names: set,
+    settings: dict,
+    delay: float,
+) -> ModelResult:
+    """Run both prompts against a single model and return scored result."""
+    max_tokens = settings.get("max_tokens", 1000)
+    temperature = settings.get("temperature", 0)
+
+    try:
+        # Prompt 1: Awareness
+        awareness_response = await call_model(
+            client, model_id, PROMPT_AWARENESS, max_tokens, temperature
+        )
+        await asyncio.sleep(delay)
+
+        # Prompt 2: Enumeration
+        enumeration_response = await call_model(
+            client, model_id, PROMPT_ENUMERATION, max_tokens, temperature
+        )
+
+        knows_tclp = detect_awareness(awareness_response)
+        scores = score_enumeration(enumeration_response, ground_truth_names)
+
+        return ModelResult(
+            model_id=model_id,
+            awareness_response=awareness_response,
+            enumeration_response=enumeration_response,
+            knows_tclp=knows_tclp,
+            real_count=scores["real_count"],
+            real_matches=scores["real_matches"],
+            hallucination_count=scores["hallucination_count"],
+            hallucinations=scores["hallucinations"],
+            accuracy=scores["accuracy"],
+        )
+
+    except Exception as e:
+        return ModelResult(
+            model_id=model_id,
+            awareness_response="",
+            enumeration_response="",
+            knows_tclp=False,
+            real_count=0,
+            real_matches=[],
+            hallucination_count=0,
+            hallucinations=[],
+            accuracy=None,
+            error=str(e),
+        )
+
+
+async def run_eval(models: list, settings: dict, dry_run: bool = False):
+    """Main evaluation loop."""
+    import os
+
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        console.print("[red]Error: OPENROUTER_API_KEY not set in .env[/red]")
+        sys.exit(1)
+
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+    )
+
+    ground_truth = load_ground_truth(CLAUSES_DIR)
+    ground_truth_names = ground_truth["names"]
+    total_clauses = ground_truth["total_clauses"]
+    delay = float(settings.get("delay_between_requests", 3))
+
+    console.print(f"\n[bold]TCLP World Knowledge Eval[/bold]")
+    console.print(f"Models: {len(models)}  |  Ground truth clauses: {total_clauses}")
+    console.print(f"Mode: {'[yellow]DRY RUN[/yellow]' if dry_run else '[green]LIVE[/green]'}\n")
+
+    if dry_run:
+        console.print("[yellow]Dry run — no API calls made.[/yellow]")
+        console.print(f"Would test {len(models)} models:")
+        for m in models:
+            console.print(f"  • {m}")
+        return
+
+    results = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Running eval...", total=len(models))
+
+        for model_id in models:
+            progress.update(task, description=f"[cyan]{model_id}[/cyan]")
+            result = await eval_model(
+                client, model_id, ground_truth_names, settings, delay
+            )
+            results.append(result)
+
+            # Live summary per model
+            status = "[green]✓[/green]" if result.knows_tclp else "[red]✗[/red]"
+            err = f" [red]ERROR: {result.error[:60]}[/red]" if result.error else ""
+            console.print(
+                f"  {status} {model_id} — "
+                f"{result.real_count} real, {result.hallucination_count} hallucinated{err}"
+            )
+
+            progress.advance(task)
+            await asyncio.sleep(delay)
+
+    # Write report
+    REPORTS_DIR.mkdir(exist_ok=True)
+    run_date = date.today().isoformat()
+    report_path = REPORTS_DIR / f"world-knowledge-{run_date}.md"
+    report = generate_report(results, total_clauses=total_clauses, run_date=run_date)
+    report_path.write_text(report, encoding="utf-8")
+
+    console.print(f"\n[bold green]Done![/bold green] Report saved to: {report_path}")
+    console.print(
+        f"Summary: {sum(1 for r in results if r.knows_tclp)}/{len(results)} models know TCLP"
+    )
+
+
+def main():
+    """Entry point."""
+    dry_run = "--dry-run" in sys.argv
+
+    config_path = CONFIG_FILE
+    if not config_path.exists():
+        console.print(f"[red]Config not found: {config_path}[/red]")
+        sys.exit(1)
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+
+    models = config.get("models", [])
+    settings = config.get("settings", {})
+
+    if not models:
+        console.print("[red]No models configured in world_knowledge_models.yaml[/red]")
+        sys.exit(1)
+
+    asyncio.run(run_eval(models, settings, dry_run=dry_run))
+
+
+if __name__ == "__main__":
+    main()
