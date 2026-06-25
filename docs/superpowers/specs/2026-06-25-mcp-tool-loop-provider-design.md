@@ -74,30 +74,58 @@ remains an independent arm.
 
 | Unit | File | Responsibility |
 |---|---|---|
-| `MCPToolExecutor` | `src/tclp_benchmark/llm_providers/mcp_executor.py` (new) | Owns the MCP SDK connection (streamable-HTTP → hosted KG endpoint + token). `list_tools()`, `call_tool(name, args) -> str`, `openai_tool_schemas()` (MCP tool list → OpenAI function-calling JSON). Connection cached/reused. |
+| `MCPToolExecutor` | `src/tclp_benchmark/llm_providers/mcp_executor.py` (new) | Owns the MCP SDK connection (streamable-HTTP → hosted KG endpoint + token). `list_tools()`, `call_tool(name, args) -> str`, `openai_tool_schemas()` (MCP tool list → OpenAI function-calling JSON). **Session lifecycle:** see §3.1. |
 | `MCPToolProvider` | `src/tclp_benchmark/llm_providers/mcp_provider.py` (new) | `BaseLLMProvider` implementation. Holds an OpenRouter `AsyncOpenAI` client + an `MCPToolExecutor`. Implements `generate_response()` — runs the tool loop. |
-| `LLMResponse` | `src/tclp_benchmark/llm_providers/base.py` (edit) | Add `tool_calls: List[dict] = field(default_factory=list)` to carry the tool-call trace. |
-| Orchestrator | `src/tclp_benchmark/evaluators/orchestrator.py` (edit) | Register `"mcp"` in `_create_provider`; persist `response.tool_calls` into the existing `response_metadata` JSON column. |
+| `LLMResponse` | `src/tclp_benchmark/llm_providers/base.py` (edit) | Add `tool_calls: List[dict] = field(default_factory=list)` after the `error` field to carry the tool-call trace. |
+| Orchestrator | `src/tclp_benchmark/evaluators/orchestrator.py` (edit) | Register `"mcp"` in `_create_provider`'s `provider_map` **and add a matching entry to `api_key_map`** — that function raises `ValueError` for any provider absent there. The MCP arm's API key is `OPENROUTER_API_KEY` (gateway); `TCLP_MCP_URL`/`TCLP_MCP_TOKEN` are read separately from env. Persist `response.tool_calls` into the existing `response_metadata` JSON column. |
 | Config | `config/providers.yaml`, `.env.example` (edit) | New `mcp` provider block (models, `max_tool_iterations`, endpoint ref); env vars `TCLP_MCP_URL`, `TCLP_MCP_TOKEN`. |
 
 **No DB migration** — the trace rides in `response_metadata` (existing JSON
 column). **No metric changes.**
 
+### 3.1 MCP session lifecycle (explicit)
+
+The `mcp` SDK's `streamablehttp_client(...)` and `ClientSession(...)` are
+anyio-based **async context managers**. Entering one in one task and exiting in
+another raises `RuntimeError: Attempted to exit cancel scope in a different
+task`, so lifecycle must be deliberate. Two facts constrain the choice:
+
+- The orchestrator runs **strictly sequentially in a single task** (nested
+  `for` loops with bare `await`, no `asyncio.gather`/`create_task`), so a session
+  used across calls would stay task-affine.
+- `_create_provider` is invoked **fresh per model** (`orchestrator.py`), so a
+  session cached on the provider instance would be built and torn down per model
+  anyway.
+
+**Decision (correctness over speed, consistent with §10):** scope the MCP
+session **per `generate_response` call** using `async with` inside the executor.
+The executor exposes an `async with MCPToolExecutor(url, token) as ex:` (or an
+internal `_session()` async-context helper) that opens the streamable-HTTP
+client + `ClientSession`, calls `initialize()`, yields, and tears down in the
+same task. `openai_tool_schemas()` is fetched once per call inside that scope.
+The session is created **lazily** (never in `__init__`, which has no running
+event loop). If profiling later shows the per-call connect cost matters, a
+persistent task-affine session can be introduced behind the same interface — but
+that is explicitly out of scope now.
+
 ## 4. Data flow — the tool loop
 
 Inside `MCPToolProvider.generate_response(request)`:
 
+All of the following runs inside the executor's per-call session scope (§3.1):
+
 ```
-tools = executor.openai_tool_schemas()          # cached
+tools = executor.openai_tool_schemas()          # fetched once in-scope
 messages = [{"role": "user", "content": request.prompt}]
 trace = []
 for i in range(max_tool_iterations):            # default 8
-    msg = await openrouter.chat.completions.create(
+    completion = await openrouter.chat.completions.create(
         model=request.model_name, messages=messages,
         tools=tools, tool_choice="auto",
         max_tokens=request.max_tokens, temperature=request.temperature,
-    ).choices[0].message
-    messages.append(msg)
+    )
+    msg = completion.choices[0].message
+    messages.append(msg.model_dump())           # serialise — don't append raw SDK object
     if not msg.tool_calls:
         return LLMResponse(text=msg.content, tool_calls=trace, ...)   # done
     for tc in msg.tool_calls:
@@ -105,12 +133,17 @@ for i in range(max_tool_iterations):            # default 8
                                           json.loads(tc.function.arguments))
         trace.append({"name": tc.function.name, "args": ..., "result_excerpt": ...})
         messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
-# iteration cap reached → one final call WITHOUT tools to force an answer;
-# set hit_tool_limit=True in metadata
+
+# iteration cap reached: one final call WITHOUT tools to force an answer,
+# then RETURN it with metadata["hit_tool_limit"] = True
+final = await openrouter.chat.completions.create(model=..., messages=messages)
+return LLMResponse(text=final.choices[0].message.content, tool_calls=trace, ...)
 ```
 
-Tool execution is sequential (correctness over speed). The trace records every
-tool call (name, arguments, a result excerpt) for transparency.
+Tool execution is sequential (correctness over speed). The assistant message is
+serialised with `model_dump()` before being appended (raw SDK message objects
+mixed with dicts across turns are fragile). The trace records every tool call
+(name, arguments, a result excerpt) for transparency.
 
 ## 5. Comparison design — three arms
 
@@ -132,6 +165,11 @@ handling).
 
 - **MCP connection failure** → return `LLMResponse(error=…)`; the run continues
   to the next model (mirrors current provider behaviour).
+- **Tool returns an error result** → MCP tool errors arrive as
+  `CallToolResult.isError == True`, **not** as a raised exception. `call_tool`
+  must inspect `result.isError` and extract `result.content[].text`; an error
+  result is fed back to the model as the tool message (so it can recover) and
+  recorded in the trace.
 - **Tool raises / malformed JSON arguments** → feed the error string back as the
   tool result so the model can recover; record it in the trace.
 - **Iteration cap reached** → one final answer call without tools; flag
