@@ -5,7 +5,14 @@ import os
 import time
 from typing import Any, Dict
 
+import openai
 from openai import AsyncOpenAI
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from .base import BaseLLMProvider, LLMRequest, LLMResponse
 from .mcp_executor import MCPToolExecutor
@@ -23,6 +30,11 @@ class MCPToolProvider(BaseLLMProvider):
         self.max_tokens = config.get("max_tokens", 1000)
         self.temperature = config.get("temperature", 0.1)
         self.config_max_iterations = config.get("max_tool_iterations", 8)
+
+        retry_config = config.get("retry", {})
+        self.max_attempts = retry_config.get("max_attempts", 3)
+        self.backoff_base = retry_config.get("exponential_base", 2)
+        self.max_wait = retry_config.get("max_wait_seconds", 60)
 
         # Secrets follow the codebase convention: sourced from env. The yaml
         # carries no URL/token; tests may pass them explicitly via config.
@@ -47,13 +59,23 @@ class MCPToolProvider(BaseLLMProvider):
     async def generate_response(self, request: LLMRequest) -> LLMResponse:
         start_time = time.time()
         trace: list = []
+
+        @retry(
+            stop=stop_after_attempt(self.max_attempts),
+            wait=wait_exponential(multiplier=self.backoff_base, min=1, max=self.max_wait),
+            retry=retry_if_exception_type((openai.RateLimitError, openai.APIConnectionError)),
+            reraise=True,
+        )
+        async def _complete(**params):
+            return await self.client.chat.completions.create(**params)
+
         try:
             async with self._executor_factory(self.mcp_url, self.mcp_token) as ex:
                 tools = await ex.list_openai_tools()
                 messages = [{"role": "user", "content": request.prompt}]
 
                 for _ in range(self.config_max_iterations):
-                    completion = await self.client.chat.completions.create(
+                    completion = await _complete(
                         model=request.model_name,
                         messages=messages,
                         tools=tools,
@@ -69,7 +91,16 @@ class MCPToolProvider(BaseLLMProvider):
                                               start_time, hit_limit=False)
 
                     for tc in msg.tool_calls:
-                        args = json.loads(tc.function.arguments or "{}")
+                        try:
+                            args = json.loads(tc.function.arguments or "{}")
+                        except json.JSONDecodeError as e:
+                            err = f"ERROR: invalid JSON arguments: {e}"
+                            trace.append({"name": tc.function.name,
+                                          "args": tc.function.arguments,
+                                          "result_excerpt": err})
+                            messages.append({"role": "tool", "tool_call_id": tc.id,
+                                             "content": err})
+                            continue
                         result = await ex.call_tool(tc.function.name, args)
                         trace.append({
                             "name": tc.function.name,
@@ -80,7 +111,7 @@ class MCPToolProvider(BaseLLMProvider):
                                          "content": result})
 
                 # Iteration cap hit: force a final answer with no tools.
-                final = await self.client.chat.completions.create(
+                final = await _complete(
                     model=request.model_name, messages=messages,
                     max_tokens=request.max_tokens, temperature=request.temperature,
                 )
