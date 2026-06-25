@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from deepeval.test_case import LLMTestCase
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 from ..storage.database import DatabaseManager
 from ..storage.models import EvaluationRun, TestCase, LLMResponse as DBLLMResponse, MetricScore
@@ -245,7 +244,7 @@ class EvaluationOrchestrator:
         # Show response or error
         if self.verbose:
             if response.error:
-                console.print(f"[red]✗ Error[/red]")
+                console.print("[red]✗ Error[/red]")
                 console.print(f"    [dim red]{response.error[:100]}...[/dim red]")
             else:
                 console.print(f"[green]✓ {response.execution_time_ms}ms[/green]")
@@ -253,7 +252,7 @@ class EvaluationOrchestrator:
                 response_preview = response.text[:300] + "..." if len(response.text) > 300 else response.text
                 console.print(Panel(
                     f"[dim]{response_preview}[/dim]",
-                    title=f"[bold green]Response[/bold green]",
+                    title="[bold green]Response[/bold green]",
                     border_style="green",
                     padding=(0, 2),
                 ))

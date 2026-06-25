@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `README.md` with OpenRouter usage examples
 - Updated `CLAUDE.md` with OpenRouter API key documentation
 - Enhanced report generation to distinguish OpenRouter web search from direct API calls
+- **World Knowledge Eval**: simplified from clause enumeration/ground-truth scoring to
+  asking models how many clauses they believe TCLP has published. Removed the
+  `clauses/` ground-truth dependency, `load_ground_truth`, and `score_enumeration`.
+
+### Removed
+- Unused dependencies: `pydantic-settings`, `alembic`, `Jinja2`, `tabulate`,
+  `google-api-python-client`
+- Local `clauses/` scraped-content directory (no longer used by any code)
+
+### Fixed
+- Ruff lint cleanups across `src/` (unused imports, f-strings without placeholders)
 
 ### Documentation
 - New comprehensive guide: `docs/openrouter-integration.md`

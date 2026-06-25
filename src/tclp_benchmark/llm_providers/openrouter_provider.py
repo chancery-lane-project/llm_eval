@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from openai import AsyncOpenAI
 from tenacity import (
     retry,

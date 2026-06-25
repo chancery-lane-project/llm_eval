@@ -2,7 +2,7 @@
 World Knowledge Eval
 ====================
 Tests which LLMs have The Chancery Lane Project in their training data,
-and how many TCLP clauses they can name — using NO web search.
+and how many TCLP clauses they believe have been published — using NO web search.
 
 Usage:
     python scripts/world_knowledge_eval.py
@@ -30,73 +30,8 @@ console = Console()
 
 # Paths (relative to project root, not scripts/)
 PROJECT_ROOT = Path(__file__).parent.parent
-CLAUSES_DIR = PROJECT_ROOT / "clauses"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 CONFIG_FILE = Path(__file__).parent / "world_knowledge_models.yaml"
-
-
-def load_ground_truth(clauses_dir: Path) -> dict:
-    """
-    Parse all .md files in clauses_dir, extract title and clause_child_name.
-
-    Returns:
-        {
-            "names": set of lowercase strings (titles + child names),
-            "total_clauses": int
-        }
-    """
-    names = set()
-    total = 0
-
-    for md_file in clauses_dir.glob("*.md"):
-        text = md_file.read_text(encoding="utf-8")
-
-        # Extract YAML frontmatter between first two --- delimiters
-        parts = text.split("---")
-        if len(parts) < 3:
-            continue
-
-        try:
-            frontmatter = yaml.safe_load(parts[1])
-        except yaml.YAMLError:
-            continue
-
-        if not isinstance(frontmatter, dict):
-            continue
-
-        total += 1
-
-        # Add title
-        title = frontmatter.get("title")
-        if title:
-            names.add(str(title).lower())
-
-        # Add clause_child_name (nested under eleventyComputed)
-        computed = frontmatter.get("eleventyComputed", {})
-        if isinstance(computed, dict):
-            child_name = computed.get("clause_child_name")
-            if child_name:
-                names.add(str(child_name).lower())
-
-    return {"names": names, "total_clauses": total}
-
-
-def _normalise(text: str) -> str:
-    """Normalise punctuation separators for fuzzy matching."""
-    # Replace em-dash, en-dash, hyphen-space with colon-space
-    text = re.sub(r"\s*[–—]\s*", ": ", text)
-    # Replace " - " (spaced hyphen) with ": "
-    text = re.sub(r"\s+-\s+", ": ", text)
-    # Collapse multiple spaces
-    text = re.sub(r" {2,}", " ", text)
-    return text.strip()
-
-
-# Keywords that flag something as a "clause-like" name (for hallucination detection)
-CLAUSE_KEYWORDS = re.compile(
-    r"\b(clause|ddq|handbook|annex|minutes|protocol|guide|checklist|questionnaire)\b",
-    re.IGNORECASE,
-)
 
 
 def detect_awareness(text: str) -> bool:
@@ -110,66 +45,37 @@ def detect_awareness(text: str) -> bool:
     )
 
 
-def score_enumeration(text: str, ground_truth_names: set) -> dict:
+def extract_clause_count(text: str) -> Optional[int]:
     """
-    Score a model's enumeration response against ground truth.
+    Extract a number from a clause-count response.
 
-    Strategy: scan every line; for each ground truth name, check if it
-    appears anywhere in the response (substring match). For hallucinations,
-    extract lines that look like clause names but don't match anything.
-
-    Returns:
-        {
-            real_count: int,
-            real_matches: list[str],
-            hallucination_count: int,
-            hallucinations: list[str],
-            accuracy: float | None  (None if nothing clause-like found)
-        }
+    Looks for patterns like "183 clauses", "published 200", "around 150", etc.
+    Returns the first plausible integer found, or None if none found.
     """
-    text_lower = text.lower()
-    text_normalised = _normalise(text_lower)
+    # Match numbers adjacent to clause-related words
+    match = re.search(
+        r"\b(\d{1,4})\s*(?:clauses?|resources?|documents?|items?|publications?)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        return int(match.group(1))
 
-    # Find which ground truth names appear in the response (original or normalised)
-    real_matches = [
-        name for name in ground_truth_names
-        if name in text_lower or _normalise(name) in text_normalised
-    ]
+    # Match "published/released/has X" patterns
+    match = re.search(
+        r"(?:published|released|produced|has|have|contains?|includes?|over|around|approximately|about|roughly)\s+(\d{1,4})\b",
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        return int(match.group(1))
 
-    # Extract candidate names: lines that contain clause-like keywords
-    candidates = []
-    for line in text.splitlines():
-        # Strip list markers (-, *, 1., •, etc.)
-        cleaned = re.sub(r"^\s*(?:[-*•]+|\d+[.)])\s*", "", line).strip()
-        # Strip surrounding quotes
-        cleaned = cleaned.strip("\"'\u201c\u201d\u2018\u2019")
-        if cleaned and CLAUSE_KEYWORDS.search(cleaned):
-            candidates.append(cleaned.lower())
+    # Last resort: first standalone number in the response
+    match = re.search(r"\b(\d{1,4})\b", text)
+    if match:
+        return int(match.group(1))
 
-    # Hallucinations: candidates not matching any ground truth name
-    # Check both original and normalised forms so punctuation variants don't
-    # produce false hallucinations (e.g. dash vs colon as separator).
-    hallucinations = [
-        c for c in candidates
-        if c not in ground_truth_names
-        and not any(c in gt or gt in c for gt in ground_truth_names)
-        and _normalise(c) not in {_normalise(gt) for gt in ground_truth_names}
-        and not any(_normalise(c) in _normalise(gt) or _normalise(gt) in _normalise(c)
-                    for gt in ground_truth_names)
-    ]
-    # Deduplicate
-    hallucinations = list(dict.fromkeys(hallucinations))
-
-    total = len(real_matches) + len(hallucinations)
-    accuracy = len(real_matches) / total if total > 0 else None
-
-    return {
-        "real_count": len(real_matches),
-        "real_matches": real_matches,
-        "hallucination_count": len(hallucinations),
-        "hallucinations": hallucinations,
-        "accuracy": accuracy,
-    }
+    return None
 
 
 @dataclass
@@ -177,131 +83,112 @@ class ModelResult:
     """Result of running both prompts against a single model."""
     model_id: str
     awareness_response: str
-    enumeration_response: str
+    clause_count_response: str
     knows_tclp: bool
-    real_count: int
-    real_matches: list
-    hallucination_count: int
-    hallucinations: list
-    accuracy: Optional[float]
+    clause_count_reported: Optional[int]
     error: Optional[str] = None
 
 
-def generate_report(
-    results: list,
-    total_clauses: int,
-    run_date: str,
-) -> str:
+def generate_report(results: list, run_date: str) -> str:
     """Generate markdown report from eval results."""
     lines = []
 
     # Header
-    lines.append(f"# TCLP World Knowledge Eval")
-    lines.append(f"")
+    lines.append("# TCLP World Knowledge Eval")
+    lines.append("")
     lines.append(f"**Date:** {run_date}  ")
     lines.append(f"**Models tested:** {len(results)}  ")
-    lines.append(f"**Ground truth clauses:** {total_clauses}  ")
-    lines.append(f"**Method:** Pure training knowledge (no web search)  ")
-    lines.append(f"")
+    lines.append("**Method:** Pure training knowledge (no web search)  ")
+    lines.append("")
 
     # --- Statistical Overview ---
     knows_count = sum(1 for r in results if r.knows_tclp)
     knows_pct = round(knows_count / len(results) * 100) if results else 0
-    real_counts = [r.real_count for r in results if not r.error]
-    mean_clauses = round(sum(real_counts) / len(real_counts), 1) if real_counts else 0
-    sorted_by_real = sorted(results, key=lambda r: r.real_count, reverse=True)
-    best = sorted_by_real[0] if sorted_by_real else None
-    # Most accurate: highest accuracy among models that found >=3 clauses
-    accurate_candidates = [r for r in results if r.real_count >= 3 and r.accuracy is not None]
-    most_accurate = max(accurate_candidates, key=lambda r: r.accuracy) if accurate_candidates else None
+    counts = [r.clause_count_reported for r in results if r.clause_count_reported is not None]
+    mean_count = round(sum(counts) / len(counts), 1) if counts else None
 
-    lines.append(f"## Statistical Overview")
-    lines.append(f"")
-    lines.append(f"| Metric | Value |")
-    lines.append(f"|--------|-------|")
+    lines.append("## Statistical Overview")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
     lines.append(f"| Models that know TCLP | {knows_count}/{len(results)} ({knows_pct}%) |")
-    lines.append(f"| Mean clauses found (real) | {mean_clauses} |")
-    lines.append(f"| Median clauses found | {_median(real_counts)} |")
-    if best:
-        lines.append(f"| Best performer (most clauses) | {best.model_id} ({best.real_count} clauses) |")
-    if most_accurate:
-        lines.append(f"| Most accurate (fewest hallucinations) | {most_accurate.model_id} ({round(most_accurate.accuracy * 100)}%) |")
-    lines.append(f"")
+    if mean_count is not None:
+        lines.append(f"| Mean clause count reported | {mean_count} |")
+        lines.append(f"| Median clause count reported | {_median(counts)} |")
+    lines.append("")
 
     # Family breakdown
-    families = {}
+    families: dict = {}
     for r in results:
         family = r.model_id.split("/")[0]
         if family not in families:
-            families[family] = {"total": 0, "aware": 0, "clauses": []}
+            families[family] = {"total": 0, "aware": 0}
         families[family]["total"] += 1
         if r.knows_tclp:
             families[family]["aware"] += 1
-        families[family]["clauses"].append(r.real_count)
 
-    lines.append(f"### By Model Family")
-    lines.append(f"")
-    lines.append(f"| Family | Models | Aware | Avg Clauses |")
-    lines.append(f"|--------|--------|-------|-------------|")
+    lines.append("### By Model Family")
+    lines.append("")
+    lines.append("| Family | Models | Aware |")
+    lines.append("|--------|--------|-------|")
     for family, data in sorted(families.items()):
-        avg = round(sum(data["clauses"]) / len(data["clauses"]), 1) if data["clauses"] else 0
-        lines.append(f"| {family} | {data['total']} | {data['aware']} | {avg} |")
-    lines.append(f"")
+        lines.append(f"| {family} | {data['total']} | {data['aware']} |")
+    lines.append("")
 
     # --- Summary Table ---
-    lines.append(f"## Results by Model")
-    lines.append(f"")
-    lines.append(f"Sorted by clauses found (real), descending.")
-    lines.append(f"")
-    lines.append(f"| Model | Knows TCLP | Clauses Found | Real | Hallucinated | Accuracy |")
-    lines.append(f"|-------|-----------|---------------|------|--------------|----------|")
+    lines.append("## Results by Model")
+    lines.append("")
+    lines.append("Sorted by clause count reported, descending.")
+    lines.append("")
+    lines.append("| Model | Knows TCLP | Clauses Reported |")
+    lines.append("|-------|-----------|-----------------|")
 
-    for r in sorted_by_real:
+    sorted_results = sorted(
+        results,
+        key=lambda r: (r.clause_count_reported or 0),
+        reverse=True,
+    )
+
+    for r in sorted_results:
         if r.error:
-            lines.append(f"| {r.model_id} | ⚠ Error | — | — | — | — |")
+            lines.append(f"| {r.model_id} | ⚠ Error | — |")
             continue
         aware = "✓" if r.knows_tclp else "✗"
-        acc = f"{round(r.accuracy * 100)}%" if r.accuracy is not None else "—"
-        lines.append(
-            f"| {r.model_id} | {aware} | {r.real_count + r.hallucination_count} "
-            f"| {r.real_count} | {r.hallucination_count} | {acc} |"
-        )
-    lines.append(f"")
+        count = str(r.clause_count_reported) if r.clause_count_reported is not None else "—"
+        lines.append(f"| {r.model_id} | {aware} | {count} |")
+    lines.append("")
 
     # --- Per-model detail ---
-    lines.append(f"## Per-Model Detail")
-    lines.append(f"")
+    lines.append("## Per-Model Detail")
+    lines.append("")
 
-    for r in sorted_by_real:
+    for r in sorted_results:
         lines.append(f"### {r.model_id}")
-        lines.append(f"")
+        lines.append("")
         if r.error:
             lines.append(f"**Error:** {r.error}")
-            lines.append(f"")
+            lines.append("")
             continue
 
         aware = "Yes" if r.knows_tclp else "No"
         lines.append(f"**Knows TCLP:** {aware}  ")
-        lines.append(f"**Real clauses:** {r.real_count}  ")
-        lines.append(f"**Hallucinations:** {r.hallucination_count}  ")
-        if r.real_matches:
-            lines.append(f"**Matched:** {', '.join(r.real_matches[:10])}"
-                         + (" …" if len(r.real_matches) > 10 else ""))
-        lines.append(f"")
-        lines.append(f"<details>")
-        lines.append(f"<summary>Awareness response</summary>")
-        lines.append(f"")
+        count = str(r.clause_count_reported) if r.clause_count_reported is not None else "Unknown"
+        lines.append(f"**Clauses reported:** {count}  ")
+        lines.append("")
+        lines.append("<details>")
+        lines.append("<summary>Awareness response</summary>")
+        lines.append("")
         lines.append(r.awareness_response)
-        lines.append(f"")
-        lines.append(f"</details>")
-        lines.append(f"")
-        lines.append(f"<details>")
-        lines.append(f"<summary>Enumeration response</summary>")
-        lines.append(f"")
-        lines.append(r.enumeration_response)
-        lines.append(f"")
-        lines.append(f"</details>")
-        lines.append(f"")
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+        lines.append("<details>")
+        lines.append("<summary>Clause count response</summary>")
+        lines.append("")
+        lines.append(r.clause_count_response)
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -321,10 +208,9 @@ PROMPT_AWARENESS = (
     "Please describe what it does, what it publishes, and who it is aimed at."
 )
 
-PROMPT_ENUMERATION = (
-    "List every clause, guide, questionnaire, handbook, or other resource "
-    "published by The Chancery Lane Project that you know about. "
-    "For each one, give its full name. "
+PROMPT_CLAUSE_COUNT = (
+    "How many clauses has The Chancery Lane Project published? "
+    "Give a number if you know it, or say you don't know. "
     "Do not search the web — use only your training knowledge."
 )
 
@@ -352,11 +238,10 @@ async def call_model(
 async def eval_model(
     client: AsyncOpenAI,
     model_id: str,
-    ground_truth_names: set,
     settings: dict,
     delay: float,
 ) -> ModelResult:
-    """Run both prompts against a single model and return scored result."""
+    """Run both prompts against a single model and return result."""
     max_tokens = settings.get("max_tokens", 1000)
     temperature = settings.get("temperature", 0)
 
@@ -367,37 +252,29 @@ async def eval_model(
         )
         await asyncio.sleep(delay)
 
-        # Prompt 2: Enumeration
-        enumeration_response = await call_model(
-            client, model_id, PROMPT_ENUMERATION, max_tokens, temperature
+        # Prompt 2: Clause count
+        clause_count_response = await call_model(
+            client, model_id, PROMPT_CLAUSE_COUNT, max_tokens, temperature
         )
 
         knows_tclp = detect_awareness(awareness_response)
-        scores = score_enumeration(enumeration_response, ground_truth_names)
+        clause_count_reported = extract_clause_count(clause_count_response) if knows_tclp else None
 
         return ModelResult(
             model_id=model_id,
             awareness_response=awareness_response,
-            enumeration_response=enumeration_response,
+            clause_count_response=clause_count_response,
             knows_tclp=knows_tclp,
-            real_count=scores["real_count"],
-            real_matches=scores["real_matches"],
-            hallucination_count=scores["hallucination_count"],
-            hallucinations=scores["hallucinations"],
-            accuracy=scores["accuracy"],
+            clause_count_reported=clause_count_reported,
         )
 
     except Exception as e:
         return ModelResult(
             model_id=model_id,
             awareness_response="",
-            enumeration_response="",
+            clause_count_response="",
             knows_tclp=False,
-            real_count=0,
-            real_matches=[],
-            hallucination_count=0,
-            hallucinations=[],
-            accuracy=None,
+            clause_count_reported=None,
             error=str(e),
         )
 
@@ -414,13 +291,10 @@ async def run_eval(models: list, settings: dict, dry_run: bool = False):
         base_url="https://openrouter.ai/api/v1",
     )
 
-    ground_truth = load_ground_truth(CLAUSES_DIR)
-    ground_truth_names = ground_truth["names"]
-    total_clauses = ground_truth["total_clauses"]
     delay = float(settings.get("delay_between_requests", 3))
 
-    console.print(f"\n[bold]TCLP World Knowledge Eval[/bold]")
-    console.print(f"Models: {len(models)}  |  Ground truth clauses: {total_clauses}")
+    console.print("\n[bold]TCLP World Knowledge Eval[/bold]")
+    console.print(f"Models: {len(models)}")
     console.print(f"Mode: {'[yellow]DRY RUN[/yellow]' if dry_run else '[green]LIVE[/green]'}\n")
 
     if dry_run:
@@ -442,18 +316,14 @@ async def run_eval(models: list, settings: dict, dry_run: bool = False):
 
         for model_id in models:
             progress.update(task, description=f"[cyan]{model_id}[/cyan]")
-            result = await eval_model(
-                client, model_id, ground_truth_names, settings, delay
-            )
+            result = await eval_model(client, model_id, settings, delay)
             results.append(result)
 
             # Live summary per model
             status = "[green]✓[/green]" if result.knows_tclp else "[red]✗[/red]"
+            count_str = f"{result.clause_count_reported} clauses" if result.clause_count_reported is not None else "count unknown"
             err = f" [red]ERROR: {result.error[:60]}[/red]" if result.error else ""
-            console.print(
-                f"  {status} {model_id} — "
-                f"{result.real_count} real, {result.hallucination_count} hallucinated{err}"
-            )
+            console.print(f"  {status} {model_id} — {count_str}{err}")
 
             progress.advance(task)
 
@@ -461,7 +331,7 @@ async def run_eval(models: list, settings: dict, dry_run: bool = False):
     REPORTS_DIR.mkdir(exist_ok=True)
     run_date = date.today().isoformat()
     report_path = REPORTS_DIR / f"world-knowledge-{run_date}.md"
-    report = generate_report(results, total_clauses=total_clauses, run_date=run_date)
+    report = generate_report(results, run_date=run_date)
     report_path.write_text(report, encoding="utf-8")
 
     console.print(f"\n[bold green]Done![/bold green] Report saved to: {report_path}")

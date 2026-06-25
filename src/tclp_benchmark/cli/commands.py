@@ -4,7 +4,6 @@ import asyncio
 import click
 from pathlib import Path
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..config.loader import ConfigLoader
 from ..storage.database import DatabaseManager
@@ -112,7 +111,7 @@ def run(version_tag, description, prompts_config, providers_config, metrics_conf
             )
         )
 
-        console.print(f"\n[green]✓[/green] Evaluation completed successfully")
+        console.print("\n[green]✓[/green] Evaluation completed successfully")
         console.print(f"[bold]Run ID:[/bold] {run_id}")
         console.print(f"[bold]Version Tag:[/bold] {version_tag}")
 
@@ -181,7 +180,7 @@ def report(version_a, version_b, output, format):
                 format=format,
             )
 
-        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print("\n[green]✓[/green] Report generated successfully")
         console.print(f"[bold]Output:[/bold] {output}")
 
     except ValueError as e:
@@ -235,7 +234,7 @@ def report_single(version_tag, output, format):
                 format=format,
             )
 
-        console.print(f"\n[green]✓[/green] Report generated successfully")
+        console.print("\n[green]✓[/green] Report generated successfully")
         console.print(f"[bold]Output:[/bold] {output}")
 
     except ValueError as e:

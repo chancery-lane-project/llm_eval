@@ -1,6 +1,6 @@
 """Pydantic models for configuration validation."""
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Dict, List, Any, Optional
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Dict, List, Optional
 
 
 class TestPrompt(BaseModel):

@@ -2,7 +2,7 @@
 import yaml
 from pathlib import Path
 from typing import Type, TypeVar
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from .models import PromptConfig, ProvidersConfig, MetricsConfig
 
 T = TypeVar("T", bound=BaseModel)
