@@ -43,7 +43,7 @@ class ConfigLoader:
         # Extract only provider configs (not 'search' section)
         provider_data = {
             k: v for k, v in data.items()
-            if k in ["openai", "anthropic", "gemini", "openrouter"]
+            if k in ["openai", "anthropic", "gemini", "openrouter", "mcp"]
         }
         return cls._validate_config(provider_data, ProvidersConfig)
 

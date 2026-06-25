@@ -1,8 +1,6 @@
 """Tests for evaluation orchestrator."""
 import pytest
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 from tclp_benchmark.evaluators.orchestrator import EvaluationOrchestrator
 from tclp_benchmark.config.models import (
     PromptConfig,
@@ -15,7 +13,7 @@ from tclp_benchmark.config.models import (
     MetricsConfig,
     MetricConfig,
 )
-from tclp_benchmark.llm_providers.base import LLMResponse, SearchResult
+from tclp_benchmark.llm_providers.base import LLMResponse
 from tclp_benchmark.storage.database import DatabaseManager
 
 
@@ -208,3 +206,72 @@ async def test_orchestrator_handles_provider_errors(
     # Verify evaluation completed despite error
     session = mock_db_manager.get_session.return_value.__enter__.return_value
     assert session.commit.called
+
+
+def test_create_provider_supports_mcp(monkeypatch):
+    from tclp_benchmark.evaluators.orchestrator import EvaluationOrchestrator
+    from tclp_benchmark.llm_providers.mcp_provider import MCPToolProvider
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    orch = EvaluationOrchestrator(db_manager=None, verbose=False)
+
+    class _Cfg:
+        def model_dump(self):
+            return {"mcp": {"url": "https://kg.example/mcp"}}
+
+    provider = orch._create_provider("mcp", _Cfg())
+    assert isinstance(provider, MCPToolProvider)
+
+
+@pytest.mark.asyncio
+async def test_run_evaluation_dispatches_mcp_provider(mock_db_manager, sample_metrics_config):
+    """Test run_evaluation dispatches to mcp provider when mcp is the only enabled provider."""
+    from tclp_benchmark.config.models import MCPProviderConfig, ModelConfig
+
+    orchestrator = EvaluationOrchestrator(db_manager=mock_db_manager, verbose=False)
+
+    # Single prompt
+    prompts_config = PromptConfig(
+        prompts={
+            "direct_lookup": [
+                TestPrompt(
+                    id="dl_mcp_001",
+                    text="Find net zero clause via MCP",
+                    expected_tclp_mention=True,
+                )
+            ]
+        }
+    )
+
+    # Only MCP provider enabled
+    providers_config = ProvidersConfig(
+        mcp=MCPProviderConfig(
+            enabled=True,
+            models=[ModelConfig(name="openai/gpt-4o", max_tokens=500, temperature=0.1)],
+        )
+    )
+
+    # Monkeypatch _execute_model to record calls
+    execute_model_calls = []
+
+    async def fake_execute_model(**kwargs):
+        execute_model_calls.append(kwargs)
+
+    orchestrator._execute_model = fake_execute_model
+
+    # DB mock needs to return an EvaluationRun with an id
+    session = mock_db_manager.get_session.return_value.__enter__.return_value
+    eval_run = MagicMock()
+    eval_run.id = 42
+    session.query.return_value.filter_by.return_value.first.return_value = eval_run
+    session.refresh.side_effect = lambda obj: setattr(obj, "id", 42) if not hasattr(obj, "id") else None
+
+    await orchestrator.run_evaluation(
+        version_tag="test-mcp-dispatch",
+        prompts_config=prompts_config,
+        providers_config=providers_config,
+        metrics_config=sample_metrics_config,
+    )
+
+    assert len(execute_model_calls) == 1
+    assert execute_model_calls[0]["provider_name"] == "mcp"

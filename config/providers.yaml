@@ -68,3 +68,26 @@ openrouter:
     max_attempts: 3
     exponential_base: 2
     max_wait_seconds: 60
+
+mcp:
+  enabled: true
+  api_endpoint: "https://openrouter.ai/api/v1/chat/completions"
+  # MCP server URL/token are read from env (TCLP_MCP_URL / TCLP_MCP_TOKEN) — not stored here.
+  max_tool_iterations: 8
+  models:
+    - name: "anthropic/claude-opus-4.5"
+      max_tokens: 1500
+      temperature: 0.1
+    - name: "openai/gpt-4o"
+      max_tokens: 1500
+      temperature: 0.1
+    - name: "google/gemini-3-flash-preview"
+      max_tokens: 1500
+      temperature: 0.1
+  rate_limit:
+    requests_per_minute: 50
+    tokens_per_minute: 100000
+  retry:
+    max_attempts: 3
+    exponential_base: 2
+    max_wait_seconds: 60

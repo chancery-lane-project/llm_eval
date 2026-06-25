@@ -14,6 +14,7 @@ from ..llm_providers.openai_provider import OpenAIProvider
 from ..llm_providers.anthropic_provider import AnthropicProvider
 from ..llm_providers.gemini_provider import GeminiProvider
 from ..llm_providers.openrouter_provider import OpenRouterProvider
+from ..llm_providers.mcp_provider import MCPToolProvider
 from ..evaluators.custom_metrics import (
     TCLPCitationMetric,
     TaxonomyAwarenessMetric,
@@ -163,6 +164,7 @@ class EvaluationOrchestrator:
             "anthropic": providers_config.anthropic,
             "gemini": providers_config.gemini,
             "openrouter": providers_config.openrouter,
+            "mcp": providers_config.mcp,
         }
 
         for provider_name, provider_config in provider_configs.items():
@@ -479,6 +481,7 @@ class EvaluationOrchestrator:
             "anthropic": "ANTHROPIC_API_KEY",
             "gemini": "GOOGLE_API_KEY",
             "openrouter": "OPENROUTER_API_KEY",
+            "mcp": "OPENROUTER_API_KEY",
         }
 
         api_key = os.getenv(api_key_map[provider_name])
@@ -491,6 +494,7 @@ class EvaluationOrchestrator:
             "anthropic": AnthropicProvider,
             "gemini": GeminiProvider,
             "openrouter": OpenRouterProvider,
+            "mcp": MCPToolProvider,
         }
 
         provider_class = provider_map[provider_name]
