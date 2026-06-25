@@ -102,6 +102,28 @@ class OpenRouterConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class MCPServerConfig(BaseModel):
+    """MCP server connection. URL/token are sourced from env at runtime;
+    these fields exist only so an explicit override is possible (e.g. tests)."""
+    url: Optional[str] = None
+    token: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MCPProviderConfig(BaseModel):
+    """Configuration for the MCP tool-loop provider (KG-backed eval arm)."""
+    enabled: bool = Field(default=True)
+    api_endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    max_tool_iterations: int = Field(default=8, ge=1)
+    mcp: Optional[MCPServerConfig] = None
+    models: List[ModelConfig]
+    rate_limit: Optional[RateLimitConfig] = None
+    retry: Optional[RetryConfig] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ProvidersConfig(BaseModel):
     """Configuration for all LLM providers."""
 
@@ -109,6 +131,7 @@ class ProvidersConfig(BaseModel):
     anthropic: Optional[ProviderConfig] = None
     gemini: Optional[ProviderConfig] = None
     openrouter: Optional[OpenRouterConfig] = None
+    mcp: Optional[MCPProviderConfig] = None
 
 
 class MetricsConfig(BaseModel):

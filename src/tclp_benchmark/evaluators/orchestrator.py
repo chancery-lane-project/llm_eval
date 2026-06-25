@@ -163,6 +163,7 @@ class EvaluationOrchestrator:
             "anthropic": providers_config.anthropic,
             "gemini": providers_config.gemini,
             "openrouter": providers_config.openrouter,
+            "mcp": providers_config.mcp,
         }
 
         for provider_name, provider_config in provider_configs.items():
