@@ -17,8 +17,10 @@
 - **Create** `src/tclp_benchmark/llm_providers/mcp_executor.py` — `MCPToolExecutor` (MCP session lifecycle, `call_tool`, `list_openai_tools`) + pure `convert_mcp_tools_to_openai()` helper.
 - **Create** `src/tclp_benchmark/llm_providers/mcp_provider.py` — `MCPToolProvider(BaseLLMProvider)` (the tool loop).
 - **Modify** `src/tclp_benchmark/llm_providers/base.py` — add `tool_calls` field to `LLMResponse`.
-- **Modify** `src/tclp_benchmark/evaluators/orchestrator.py` — register `"mcp"` in `provider_map` and `api_key_map`.
-- **Modify** `config/providers.yaml` — add `mcp` block.
+- **Modify** `src/tclp_benchmark/config/models.py` — add `MCPProviderConfig` (+ nested server model) and a `mcp` field on `ProvidersConfig`.
+- **Modify** `src/tclp_benchmark/config/loader.py` — add `"mcp"` to the provider allowlist in `load_providers`.
+- **Modify** `src/tclp_benchmark/evaluators/orchestrator.py` — add `"mcp"` to `run_evaluation`'s `provider_configs` dict, and register `"mcp"` in `_create_provider`'s `provider_map` and `api_key_map`.
+- **Modify** `config/providers.yaml` — add `mcp` block (no secrets — URL/token come from env).
 - **Modify** `.env.example` — add `TCLP_MCP_URL`, `TCLP_MCP_TOKEN`.
 - **Modify** `pyproject.toml` — add `mcp` dependency.
 - **Create** `tests/unit/llm_providers/test_mcp_executor.py`
@@ -459,8 +461,7 @@ async def test_iteration_cap_forces_final_answer(mocker):
     looping = [_completion(_msg(tool_calls=[_tool_call(f"c{i}", "search", {"query": "x"})]))
                for i in range(8)]
     final = _completion(_msg(content="Best effort answer."))
-    provider = _make_provider(mocker, looping + [final])
-    provider.config_max_iterations = 8
+    provider = _make_provider(mocker, looping + [final])  # config already sets max_tool_iterations=8
 
     resp = await provider.generate_response(_request())
 
@@ -495,6 +496,7 @@ Create `src/tclp_benchmark/llm_providers/mcp_provider.py`:
 """MCP tool-loop provider: OpenRouter gateway + client-side KG tool execution."""
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -517,9 +519,11 @@ class MCPToolProvider(BaseLLMProvider):
         self.temperature = config.get("temperature", 0.1)
         self.config_max_iterations = config.get("max_tool_iterations", 8)
 
-        mcp_config = config.get("mcp", {})
-        self.mcp_url = mcp_config.get("url")
-        self.mcp_token = mcp_config.get("token")  # optional; may be None
+        # Secrets follow the codebase convention: sourced from env. The yaml
+        # carries no URL/token; tests may pass them explicitly via config.
+        mcp_config = config.get("mcp") or {}
+        self.mcp_url = mcp_config.get("url") or os.getenv("TCLP_MCP_URL")
+        self.mcp_token = mcp_config.get("token") or os.getenv("TCLP_MCP_TOKEN")
 
         api_endpoint = config.get(
             "api_endpoint", "https://openrouter.ai/api/v1/chat/completions"
@@ -615,7 +619,127 @@ git commit -m "feat: add MCPToolProvider tool-call loop"
 
 ---
 
-## Task 6: Register `mcp` in the orchestrator
+## Task 6: Config model + pipeline wiring (makes the arm reachable)
+
+> **Why this task exists:** registering in `_create_provider` (Task 7) is necessary but **not sufficient**. The `mcp` yaml block is silently dropped before it reaches the provider unless: (a) a Pydantic model accepts it, (b) `ProvidersConfig` has a `mcp` field, (c) the loader allowlist includes `"mcp"`, and (d) `run_evaluation` iterates `mcp`. Without this task the `--providers mcp` run produces zero results while all unit tests pass. Making `MCPProviderConfig.models` a `List[ModelConfig]` lets the existing `else` branch in `run_evaluation` (orchestrator.py:193-203) dispatch it with no further change.
+
+**Files:**
+- Modify: `src/tclp_benchmark/config/models.py` (add models after `OpenRouterConfig` ~line 102; extend `ProvidersConfig` ~lines 105-111)
+- Modify: `src/tclp_benchmark/config/loader.py:44-47` (allowlist)
+- Modify: `src/tclp_benchmark/evaluators/orchestrator.py:161-166` (`provider_configs` dict)
+- Test: `tests/unit/config/test_openrouter_config.py` or a new `tests/unit/config/test_mcp_config.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/unit/config/test_mcp_config.py`:
+
+```python
+"""Config wiring tests for the MCP provider arm."""
+from tclp_benchmark.config.models import ProvidersConfig, MCPProviderConfig
+
+
+def test_providers_config_accepts_mcp_block():
+    data = {
+        "mcp": {
+            "enabled": True,
+            "max_tool_iterations": 8,
+            "models": [
+                {"name": "openai/gpt-4o", "max_tokens": 1500, "temperature": 0.1},
+            ],
+        }
+    }
+    cfg = ProvidersConfig(**data)
+    assert isinstance(cfg.mcp, MCPProviderConfig)
+    assert cfg.mcp.models[0].name == "openai/gpt-4o"
+    assert cfg.mcp.max_tool_iterations == 8
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv/bin/python -m pytest tests/unit/config/test_mcp_config.py -q --no-cov`
+Expected: FAIL — `ImportError` (`MCPProviderConfig` does not exist).
+
+- [ ] **Step 3: Add the config models**
+
+In `config/models.py`, after `OpenRouterConfig` (it already imports `ModelConfig`, `RateLimitConfig`, `RetryConfig`, `ConfigDict`):
+
+```python
+class MCPServerConfig(BaseModel):
+    """MCP server connection. URL/token are sourced from env at runtime;
+    these fields exist only so an explicit override is possible (e.g. tests)."""
+    url: Optional[str] = None
+    token: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MCPProviderConfig(BaseModel):
+    """Configuration for the MCP tool-loop provider (KG-backed eval arm)."""
+    enabled: bool = Field(default=True)
+    api_endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    max_tool_iterations: int = Field(default=8, ge=1)
+    mcp: Optional[MCPServerConfig] = None
+    models: List[ModelConfig]
+    rate_limit: Optional[RateLimitConfig] = None
+    retry: Optional[RetryConfig] = None
+
+    model_config = ConfigDict(extra="forbid")
+```
+
+Then add the field to `ProvidersConfig`:
+
+```python
+    openrouter: Optional[OpenRouterConfig] = None
+    mcp: Optional[MCPProviderConfig] = None
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `.venv/bin/python -m pytest tests/unit/config/test_mcp_config.py -q --no-cov`
+Expected: PASS
+
+- [ ] **Step 5: Add `"mcp"` to the loader allowlist**
+
+In `config/loader.py`, `load_providers` (lines 44-47):
+
+```python
+        provider_data = {
+            k: v for k, v in data.items()
+            if k in ["openai", "anthropic", "gemini", "openrouter", "mcp"]
+        }
+```
+
+- [ ] **Step 6: Wire `mcp` into `run_evaluation`**
+
+In `orchestrator.py` (lines 161-166):
+
+```python
+        provider_configs = {
+            "openai": providers_config.openai,
+            "anthropic": providers_config.anthropic,
+            "gemini": providers_config.gemini,
+            "openrouter": providers_config.openrouter,
+            "mcp": providers_config.mcp,
+        }
+```
+
+No change to the iteration logic: `mcp` has `models: List[ModelConfig]`, so it falls into the existing `else` branch (lines 193-203) that already handles `ModelConfig` objects.
+
+- [ ] **Step 7: Run the config + orchestrator unit tests**
+
+Run: `.venv/bin/python -m pytest tests/unit/config/ tests/unit/test_orchestrator.py -q --no-cov`
+Expected: PASS (existing tests unaffected; new config test green).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/tclp_benchmark/config/models.py src/tclp_benchmark/config/loader.py src/tclp_benchmark/evaluators/orchestrator.py tests/unit/config/test_mcp_config.py
+git commit -m "feat: wire mcp provider config through loader and run_evaluation"
+```
+
+---
+
+## Task 7: Register `mcp` in `_create_provider`
 
 **Files:**
 - Modify: `src/tclp_benchmark/evaluators/orchestrator.py` (imports near line 13-16; `_create_provider` maps at lines 477-494)
@@ -692,7 +816,12 @@ git commit -m "feat: register mcp provider in orchestrator"
 
 ---
 
-## Task 7: Config + env example
+## Task 8: Config + env example
+
+> The loader uses plain `yaml.safe_load` with **no** `${ENV_VAR}` expansion
+> (confirmed: `loader.py:20-22`). So the yaml carries **no** URL/token — the
+> provider sources them from `os.getenv` (already implemented in Task 5's
+> `__init__`). The yaml block here is secret-free.
 
 **Files:**
 - Modify: `config/providers.yaml`
@@ -706,10 +835,7 @@ Append to `config/providers.yaml`:
 mcp:
   enabled: true
   api_endpoint: "https://openrouter.ai/api/v1/chat/completions"
-  # MCP server connection (URL required; token optional — auth may be in the URL query string)
-  mcp:
-    url: "${TCLP_MCP_URL}"
-    token: "${TCLP_MCP_TOKEN}"
+  # MCP server URL/token are read from env (TCLP_MCP_URL / TCLP_MCP_TOKEN) — not stored here.
   max_tool_iterations: 8
   models:
     - name: "anthropic/claude-opus-4.5"
@@ -729,8 +855,6 @@ mcp:
     exponential_base: 2
     max_wait_seconds: 60
 ```
-
-> **Check during execution:** confirm how this project's config loader expands `${ENV_VAR}` placeholders (inspect `src/tclp_benchmark/config/loader.py` and `config/models.py`). If it does **not** expand env vars, instead have `MCPToolProvider.__init__` read `TCLP_MCP_URL`/`TCLP_MCP_TOKEN` from `os.getenv` as a fallback when `config["mcp"]["url"]` is empty/contains a literal `${...}`. Adjust the task here to match the loader's actual behaviour before committing.
 
 - [ ] **Step 2: Add env vars to `.env.example`**
 
@@ -757,7 +881,7 @@ git commit -m "feat: add mcp provider config and env example"
 
 ---
 
-## Task 8: Env-gated integration test (live KG)
+## Task 9: Env-gated integration test (live KG)
 
 **Files:**
 - Create: `tests/integration/end_to_end/test_mcp_e2e.py`
@@ -813,18 +937,18 @@ git commit -m "test: add env-gated live MCP integration test"
 
 ---
 
-## Task 9: Full suite + lint gate
+## Task 10: Full suite + lint gate
 
 **Files:** none (verification)
 
 - [ ] **Step 1: Run the whole unit suite**
 
 Run: `.venv/bin/python -m pytest tests/ -q --no-cov`
-Expected: all pass (prior 103 + the new tests), integration test skipped.
+Expected: all pass (prior 103 + the new unit/config/orchestrator tests added by this plan), integration test skipped.
 
 - [ ] **Step 2: Lint the new code**
 
-Run: `.venv/bin/ruff check src/tclp_benchmark/llm_providers/mcp_executor.py src/tclp_benchmark/llm_providers/mcp_provider.py src/tclp_benchmark/llm_providers/base.py src/tclp_benchmark/evaluators/orchestrator.py`
+Run: `.venv/bin/ruff check src/tclp_benchmark/llm_providers/mcp_executor.py src/tclp_benchmark/llm_providers/mcp_provider.py src/tclp_benchmark/llm_providers/base.py src/tclp_benchmark/evaluators/orchestrator.py src/tclp_benchmark/config/models.py src/tclp_benchmark/config/loader.py`
 Expected: `All checks passed!`
 
 - [ ] **Step 3: Commit any lint fixes (if needed)**
