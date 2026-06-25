@@ -1,7 +1,7 @@
 """Base abstraction for LLM providers."""
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -37,6 +37,7 @@ class LLMResponse:
     metadata: Dict[str, Any]
     execution_time_ms: int
     error: Optional[str] = None
+    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class BaseLLMProvider(ABC):
