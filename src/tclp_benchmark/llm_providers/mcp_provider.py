@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import time
 from typing import Any, Dict
 
@@ -20,6 +21,13 @@ from .mcp_executor import MCPToolExecutor
 logger = logging.getLogger(__name__)
 
 _EXCERPT_LEN = 500
+
+_URL_QUERY_RE = re.compile(r"(https?://[^\s'\"]+?)\?[^\s'\"]*")
+
+
+def _redact_url_secrets(text: str) -> str:
+    """Strip query strings from any URLs in a message (they may carry auth tokens)."""
+    return _URL_QUERY_RE.sub(r"\1?<redacted>", text)
 
 
 class MCPToolProvider(BaseLLMProvider):
@@ -119,12 +127,14 @@ class MCPToolProvider(BaseLLMProvider):
                                       trace, start_time, hit_limit=True)
 
         except Exception as e:  # graceful: matches other providers
-            logger.error(f"MCP provider error: {e}")
+            msg = _redact_url_secrets(str(e))
+            logger.error(f"MCP provider error: {msg}")
             return LLMResponse(
                 text="", model_name=request.model_name, provider_name=self.name,
-                search_query=request.prompt, search_results=[], metadata={},
+                search_query=request.prompt, search_results=[],
+                metadata={"tool_calls": trace, "tool_call_count": len(trace)},
                 execution_time_ms=int((time.time() - start_time) * 1000),
-                error=str(e), tool_calls=trace,
+                error=msg, tool_calls=trace,
             )
 
     def _response(self, request, text, trace, start_time, hit_limit):

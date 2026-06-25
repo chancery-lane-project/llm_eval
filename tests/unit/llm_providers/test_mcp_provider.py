@@ -4,7 +4,10 @@ import pytest
 from types import SimpleNamespace
 
 from tclp_benchmark.llm_providers.base import LLMRequest, LLMResponse
-from tclp_benchmark.llm_providers.mcp_provider import MCPToolProvider
+from tclp_benchmark.llm_providers.mcp_provider import (
+    MCPToolProvider,
+    _redact_url_secrets,
+)
 
 
 def test_llmresponse_has_tool_calls_default_empty():
@@ -190,3 +193,73 @@ async def test_tool_error_string_flows_back_and_model_recovers(mocker):
     second_messages = provider.client.chat.completions.create.await_args_list[1].kwargs["messages"]
     tool_messages = [m for m in second_messages if m.get("role") == "tool"]
     assert tool_messages[0]["content"].startswith("ERROR")
+
+
+def test_redact_url_secrets_strips_query():
+    out = _redact_url_secrets("see https://h/p?key=abc x")
+    assert "https://h/p?<redacted>" in out
+    assert "abc" not in out
+
+
+def test_redact_url_secrets_passes_through_without_url():
+    text = "plain error with no url and no secret"
+    assert _redact_url_secrets(text) == text
+
+
+@pytest.mark.asyncio
+async def test_error_response_redacts_url_query_string(mocker):
+    class _LeakyExecutor(_FakeExecutor):
+        async def __aenter__(self):
+            raise ConnectionError(
+                "failed connecting to https://kg.example/mcp?key=SUPERSECRET timeout"
+            )
+
+    provider = MCPToolProvider(
+        config={"mcp": {"url": "https://kg.example/mcp?key=SUPERSECRET"}},
+        api_key="sk-test",
+        executor_factory=_LeakyExecutor,
+    )
+
+    resp = await provider.generate_response(_request())
+
+    assert resp.error is not None
+    assert "SUPERSECRET" not in resp.error
+    assert "<redacted>" in resp.error
+
+
+@pytest.mark.asyncio
+async def test_partial_trace_persisted_on_midloop_failure(mocker):
+    class _MidLoopBoomExecutor(_FakeExecutor):
+        async def call_tool(self, name, arguments):
+            self.calls.append((name, arguments))
+            if len(self.calls) >= 2:
+                raise ConnectionError("dropped mid-loop")
+            return '{"results": [{"title": "Evies Clause"}]}'
+
+    first = _completion(_msg(tool_calls=[_tool_call("c1", "search", {"query": "a"})]))
+    second = _completion(_msg(tool_calls=[_tool_call("c2", "search", {"query": "b"})]))
+    provider = _make_provider(
+        mocker, [first, second], executor_factory=_MidLoopBoomExecutor
+    )
+
+    resp = await provider.generate_response(_request())
+
+    assert resp.error is not None
+    # The partial trace from the first successful tool call survived into metadata.
+    assert resp.metadata["tool_calls"]
+    assert resp.metadata["tool_call_count"] == len(resp.metadata["tool_calls"])
+
+
+@pytest.mark.asyncio
+async def test_connection_failure_metadata_carries_tool_calls_key():
+    class _BoomExecutor(_FakeExecutor):
+        async def __aenter__(self):
+            raise ConnectionError("no endpoint")
+
+    provider = MCPToolProvider(
+        config={"mcp": {"url": "https://bad"}}, api_key="sk-test",
+        executor_factory=_BoomExecutor,
+    )
+    resp = await provider.generate_response(_request())
+    assert resp.error is not None
+    assert resp.metadata.get("tool_calls") == []
