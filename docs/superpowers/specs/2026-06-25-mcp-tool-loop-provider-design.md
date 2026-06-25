@@ -77,8 +77,8 @@ remains an independent arm.
 | `MCPToolExecutor` | `src/tclp_benchmark/llm_providers/mcp_executor.py` (new) | Owns the MCP SDK connection (streamable-HTTP → hosted KG endpoint + token). `list_tools()`, `call_tool(name, args) -> str`, `openai_tool_schemas()` (MCP tool list → OpenAI function-calling JSON). **Session lifecycle:** see §3.1. |
 | `MCPToolProvider` | `src/tclp_benchmark/llm_providers/mcp_provider.py` (new) | `BaseLLMProvider` implementation. Holds an OpenRouter `AsyncOpenAI` client + an `MCPToolExecutor`. Implements `generate_response()` — runs the tool loop. |
 | `LLMResponse` | `src/tclp_benchmark/llm_providers/base.py` (edit) | Add `tool_calls: List[dict] = field(default_factory=list)` after the `error` field to carry the tool-call trace. |
-| Orchestrator | `src/tclp_benchmark/evaluators/orchestrator.py` (edit) | Register `"mcp"` in `_create_provider`'s `provider_map` **and add a matching entry to `api_key_map`** — that function raises `ValueError` for any provider absent there. The MCP arm's API key is `OPENROUTER_API_KEY` (gateway); `TCLP_MCP_URL`/`TCLP_MCP_TOKEN` are read separately from env. Persist `response.tool_calls` into the existing `response_metadata` JSON column. |
-| Config | `config/providers.yaml`, `.env.example` (edit) | New `mcp` provider block (models, `max_tool_iterations`, endpoint ref); env vars `TCLP_MCP_URL`, `TCLP_MCP_TOKEN`. |
+| Orchestrator | `src/tclp_benchmark/evaluators/orchestrator.py` (edit) | Register `"mcp"` in `_create_provider`'s `provider_map` **and add a matching entry to `api_key_map`** — that function raises `ValueError` for any provider absent there. The MCP arm's API key is `OPENROUTER_API_KEY` (gateway); `TCLP_MCP_URL` and the **optional** `TCLP_MCP_TOKEN` are read separately from env (see §3.2). Persist `response.tool_calls` into the existing `response_metadata` JSON column. |
+| Config | `config/providers.yaml`, `.env.example` (edit) | New `mcp` provider block (models, `max_tool_iterations`, endpoint ref); env var `TCLP_MCP_URL` (required) and `TCLP_MCP_TOKEN` (**optional** — see §3.2). |
 
 **No DB migration** — the trace rides in `response_metadata` (existing JSON
 column). **No metric changes.**
@@ -107,6 +107,24 @@ The session is created **lazily** (never in `__init__`, which has no running
 event loop). If profiling later shows the per-call connect cost matters, a
 persistent task-affine session can be introduced behind the same interface — but
 that is explicitly out of scope now.
+
+### 3.2 Authentication (two modes, token optional)
+
+The hosted KG endpoint accepts auth **either** embedded in the URL query string
+**or** as an HTTP header token. So:
+
+- `TCLP_MCP_URL` — **required**. May already carry credentials as a query string
+  (e.g. `https://kg.example/mcp?key=…`), in which case no separate token is
+  needed.
+- `TCLP_MCP_TOKEN` — **optional**. When set, the executor passes it as an HTTP
+  header (`Authorization: Bearer <token>`) to `streamablehttp_client(...)` via
+  its `headers=` argument. When unset, the executor connects with the URL alone.
+
+The executor builds the header dict conditionally: `headers = {"Authorization":
+f"Bearer {token}"} if token else None`. No failure if the token is absent — that
+is a supported configuration, not an error. (A connection that genuinely
+requires auth and gets none will fail at connect time and degrade gracefully per
+§6.)
 
 ## 4. Data flow — the tool loop
 
