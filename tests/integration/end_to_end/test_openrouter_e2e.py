@@ -155,8 +155,10 @@ def test_full_openrouter_evaluation_run(runner, test_env):
 @pytest.mark.integration
 def test_openrouter_with_missing_api_key(runner, test_env, monkeypatch):
     """Test that OpenRouter fails gracefully without API key."""
-    # Remove API key
+    # Remove API key, and stop the CLI from reloading it from .env on disk
+    # (the cli group calls load_dotenv()), so the missing-key path is exercised.
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("tclp_benchmark.cli.commands.load_dotenv", lambda *a, **k: None)
 
     result = runner.invoke(
         cli,

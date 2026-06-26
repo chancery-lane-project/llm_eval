@@ -3,6 +3,7 @@ import os
 import asyncio
 import click
 from pathlib import Path
+from dotenv import load_dotenv
 from rich.console import Console
 
 from ..config.loader import ConfigLoader
@@ -17,7 +18,9 @@ console = Console()
 @click.version_option(version="0.1.0")
 def cli():
     """TCLP Semantic Benchmark - Measure LLM discovery impact from semantic markup."""
-    pass
+    # Load .env so API keys and TCLP_MCP_URL/TCLP_MCP_TOKEN are available to all
+    # subcommands (per project convention of python-dotenv for secrets).
+    load_dotenv()
 
 
 @cli.command()
