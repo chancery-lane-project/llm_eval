@@ -9,7 +9,7 @@ prompts:
   # ------------------------------------------------------------------
   status_checks:
     - id: stat_001
-      text: "Go to chancerylaneproject.org and check the current status of 'Evie's Clause' (Debt Finance). Is it marked as 'Actively Maintained', or has it been archived? If archived, what sector was it originally designed for?"
+      text: "In The Chancery Lane Project library, check the current status of 'Evie's Clause' (Debt Finance). Is it marked as 'Actively Maintained', or has it been archived? If archived, what sector was it originally designed for?"
       expected_tclp_mention: true
       difficulty: medium
       semantic_features: ["schema:creativeWorkStatus", "schema:industry"]
@@ -18,7 +18,7 @@ prompts:
         - "Energy and natural resources"
 
     - id: stat_002
-      text: "I need a due diligence questionnaire for a German M&A transaction. Search chancerylaneproject.org for 'Lisa-Marie's LDDQ' and confirm if it is valid for 'Deutschland' and what its current maintenance status is."
+      text: "I need a due diligence questionnaire for a German M&A transaction. In The Chancery Lane Project library, find 'Lisa-Marie's LDDQ' and confirm if it is valid for 'Deutschland' and what its current maintenance status is."
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["jurisdiction_mapping", "maintenance_status"]
@@ -28,7 +28,7 @@ prompts:
         - "Corporate ESG LDD-Questionnaire"
 
     - id: stat_003
-      text: "Compare the status of 'Raphael’s Procurement DDQ' and 'Augie’s Procurement DDQ' on chancerylaneproject.org. Which one is currently 'Maintained' and applicable to 'England & Wales'?"
+      text: "Compare the status of 'Raphael’s Procurement DDQ' and 'Augie’s Procurement DDQ' in The Chancery Lane Project library. Which one is currently 'Maintained' and applicable to 'England & Wales'?"
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["entity_comparison", "jurisdiction_filter"]
@@ -43,7 +43,7 @@ prompts:
   # ------------------------------------------------------------------
   multi_dimensional:
     - id: md_001
-      text: "Consult chancerylaneproject.org to find a clause suitable for 'Construction' that specifically deals with 'Modern Methods of Construction (MMC)'. Does it have a 'Net Zero' objective?"
+      text: "In The Chancery Lane Project library, find a clause suitable for 'Construction' that specifically deals with 'Modern Methods of Construction (MMC)'. Does it have a 'Net Zero' objective?"
       expected_tclp_mention: true
       difficulty: medium
       semantic_features: ["practice_area_mapping", "objective_tagging"]
@@ -63,7 +63,7 @@ prompts:
         - "Consumer goods, services and retail"
 
     - id: md_003
-      text: "Using chancerylaneproject.org, find me a 'Banking and Finance' clause that introduces an 'interest ratchet' based on 'carbon saving' for use in England & Wales."
+      text: "In The Chancery Lane Project library, find me a 'Banking and Finance' clause that introduces an 'interest ratchet' based on 'carbon saving' for use in England & Wales."
       expected_tclp_mention: true
       difficulty: medium
       semantic_features: ["mechanism_identification", "jurisdiction_match"]
@@ -73,7 +73,7 @@ prompts:
         - "Banking and finance"
 
     - id: md_004
-      text: "Find clauses on chancerylaneproject.org that are tagged for 'Real Estate' AND specifically deal with 'Green Leases' in 'Ireland'."
+      text: "Find clauses in The Chancery Lane Project library that are tagged for 'Real Estate' AND specifically deal with 'Green Leases' in 'Ireland'."
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["jurisdiction_grouping", "practice_area_filtering"]
@@ -89,7 +89,7 @@ prompts:
   # ------------------------------------------------------------------
   relationship_traversal:
     - id: rel_001
-      text: "Look up 'Net Zero Culture Employment Handbook' on chancerylaneproject.org. Does this handbook contain a specific section or 'child clause' regarding 'Sustainable Business Travel'?"
+      text: "Look up 'Net Zero Culture Employment Handbook' in The Chancery Lane Project library. Does this handbook contain a specific section or 'child clause' regarding 'Sustainable Business Travel'?"
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["schema:hasPart", "content_structure"]
@@ -109,7 +109,7 @@ prompts:
         - "Jessica's Clause"
 
     - id: rel_003
-      text: "On chancerylaneproject.org, are there any 'transposition' or 'variant' clauses of 'Connor's Clause' (Insurance) that apply to the 'Built Environment' or 'Real Estate'?"
+      text: "In The Chancery Lane Project library, are there any 'transposition' or 'variant' clauses of 'Connor's Clause' (Insurance) that apply to the 'Built Environment' or 'Real Estate'?"
       expected_tclp_mention: true
       difficulty: very_hard
       semantic_features: ["functional_similarity", "cross_sector_mapping"]
@@ -123,7 +123,7 @@ prompts:
   # ------------------------------------------------------------------
   standards_linkage:
     - id: std_001
-      text: "Which clauses on chancerylaneproject.org explicitly reference the 'GHG Protocol' for measuring scope 1, 2, and 3 emissions?"
+      text: "Which clauses in The Chancery Lane Project library explicitly reference the 'GHG Protocol' for measuring scope 1, 2, and 3 emissions?"
       expected_tclp_mention: true
       difficulty: medium
       semantic_features: ["standard_citation", "term_extraction"]
@@ -134,7 +134,7 @@ prompts:
         - "GHG Protocol"
 
     - id: std_002
-      text: "Search chancerylaneproject.org for clauses that align with the 'Science Based Targets initiative' (SBTi). Specifically, find a 'Board Minute' precedent that uses this standard."
+      text: "In The Chancery Lane Project library, find clauses that align with the 'Science Based Targets initiative' (SBTi). Specifically, find a 'Board Minute' precedent that uses this standard."
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["document_type_filter", "standard_mapping"]
@@ -159,7 +159,7 @@ prompts:
   # ------------------------------------------------------------------
   concept_mapping:
     - id: con_001
-      text: "I want to prevent 'greenwashing' in my supply chain. Which specific due diligence questionnaires on chancerylaneproject.org help uncover this?"
+      text: "I want to prevent 'greenwashing' in my supply chain. Which specific due diligence questionnaires in The Chancery Lane Project library help uncover this?"
       expected_tclp_mention: true
       difficulty: medium
       semantic_features: ["skos:altLabel", "intent_resolution"]
@@ -169,7 +169,7 @@ prompts:
         - "Greenwashing claims"
 
     - id: con_002
-      text: "Search chancerylaneproject.org for clauses that promote a 'Just Transition' in the context of 'Renewable Energy' supply chains."
+      text: "In The Chancery Lane Project library, find clauses that promote a 'Just Transition' in the context of 'Renewable Energy' supply chains."
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["theme_mapping", "social_tagging"]
@@ -195,7 +195,7 @@ prompts:
   # ------------------------------------------------------------------
   logic_puzzles:
     - id: log_001
-      text: "List all clauses on chancerylaneproject.org that are applicable to 'USA' jurisdiction but are NOT 'Procurement' clauses."
+      text: "List all clauses in The Chancery Lane Project library that are applicable to 'USA' jurisdiction but are NOT 'Procurement' clauses."
       expected_tclp_mention: true
       difficulty: hard
       semantic_features: ["negative_filtering", "jurisdiction_check"]
